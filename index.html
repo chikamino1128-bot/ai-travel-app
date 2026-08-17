@@ -260,11 +260,21 @@
       tripData.chatHistory.push({ sender: 'ai', text: '考え中...' });
       switchTab('ai');
 
-      const systemPrompt = "あなたは旅行専門の超優秀な旅程プランナーAIです。移動手段、所要時間、位置関係、事前予約の要・不要、おすすめスポットを具体的かつ分かりやすく提案してください。";
+      // AIに持ち物の自動提案を含めた構造化レスポンスを求めるプロンプト
+      const systemPrompt = `あなたは旅行専門の超優秀な旅程プランナーAIです。
+回答は必ず以下のJSON形式のみで出力してください（Markdownの記法や余計な解説文は含めないでください）。
+
+{
+  "reply": "ユーザーへの回答メッセージ（移動手段、所要時間、おすすめスポット等）",
+  "suggestedBelongings": ["追加すべき持ち物1", "追加すべき持ち物2"]
+}
+
+※suggestedBelongingsには、この会話や目的地で必要になりそうな持ち物（例: 海外ならパスポート、温泉ならフェイスタオル、ドライブならETCカード、寒冷地なら羽織るものなど）を配列形式で抽出してください。特に新しい持ち物が必要ない場合は空配列 [] にしてください。`;
+
       const fullPrompt = `${systemPrompt}\n\n現在の旅程データ: ${JSON.stringify(tripData.schedule)}\n\nユーザーの要望: ${val}`;
 
       try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,10 +287,38 @@
           throw new Error(data.error.message);
         }
 
-        const aiResponseText = data.candidates[0].content.parts[0].text;
-        tripData.chatHistory[tripData.chatHistory.length - 1].text = aiResponseText;
+        const rawText = data.candidates[0].content.parts[0].text;
+        
+        // JSONの解析（Markdownブロックが付いていても除去）
+        let cleanJsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJsonText);
+
+        // チャットログにAIの回答を反映
+        tripData.chatHistory[tripData.chatHistory.length - 1].text = parsed.reply;
+
+        // 持ち物の自動追加処理
+        if (parsed.suggestedBelongings && parsed.suggestedBelongings.length > 0) {
+          let addedCount = 0;
+          parsed.suggestedBelongings.forEach(itemStr => {
+            const exists = tripData.belongings.some(b => b.item.includes(itemStr) || itemStr.includes(b.item));
+            if (!exists) {
+              tripData.belongings.push({
+                id: Date.now() + Math.random(),
+                item: itemStr,
+                checked: false,
+                assignedTo: "🤖 AI提案"
+              });
+              addedCount++;
+            }
+          });
+
+          if (addedCount > 0) {
+            tripData.chatHistory[tripData.chatHistory.length - 1].text += `\n\n💡 **持ち物リストに ${addedCount} 件のアイテムを自動追加しました！** （持ち物タブで確認できます）`;
+          }
+        }
+
       } catch (error) {
-        tripData.chatHistory[tripData.chatHistory.length - 1].text = "エラーが発生しました。Google AI Studioでキーを再発行して入力し直してください。";
+        tripData.chatHistory[tripData.chatHistory.length - 1].text = `エラーが発生しました:\n${error.message}\n\n※APIキーをご確認いただくか、AI Studioで新しく生成したキーをお試しください。`;
       }
 
       switchTab('ai');
@@ -325,19 +363,30 @@
     function renderBelongings() {
       return `
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h2 class="text-sm font-bold text-gray-700 mb-3">持ち物チェックリスト</h2>
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-sm font-bold text-gray-700">持ち物チェックリスト</h2>
+            <span class="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-semibold">AI自動判定あり</span>
+          </div>
           <div class="space-y-3">
             ${tripData.belongings.map(b => `
-              <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
+              <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded border-b border-gray-50 last:border-none">
                 <div class="flex items-center gap-2">
-                  <input type="checkbox" ${b.checked ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded">
+                  <input type="checkbox" ${b.checked ? 'checked' : ''} onchange="toggleBelonging(${b.id})" class="w-4 h-4 text-blue-600 rounded">
                   <span class="${b.checked ? 'line-through text-gray-400' : 'text-gray-700'}">${b.item}</span>
                 </div>
-                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${b.assignedTo}</span>
+                <span class="text-xs ${b.assignedTo === '🤖 AI提案' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-gray-100 text-gray-500'} px-2 py-0.5 rounded">${b.assignedTo}</span>
               </label>
             `).join('')}
           </div>
         </div>`;
+    }
+
+    function toggleBelonging(id) {
+      const item = tripData.belongings.find(b => b.id === id);
+      if (item) {
+        item.checked = !item.checked;
+        switchTab('belongings');
+      }
     }
 
     const views = {
