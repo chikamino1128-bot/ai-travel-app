@@ -17,6 +17,10 @@
         <p id="header-sub" class="text-xs text-blue-100">旅行を選択してください</p>
       </div>
       <div class="flex gap-1.5">
+        <button onclick="shareActiveTrip()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold" title="共有URLをコピー">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+          <span>共有</span>
+        </button>
         <button onclick="showEditTripModal()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs p-2 rounded-lg flex items-center justify-center font-bold" title="旅行設定の変更">
           <i data-lucide="settings" class="w-4 h-4"></i>
         </button>
@@ -128,6 +132,53 @@
     let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
     let openMemberDetails = {};
 
+    // --- 共有URL解析（URLハッシュから旅行データを読み込む） ---
+    function checkSharedURL() {
+      if (window.location.hash.startsWith('#trip=')) {
+        try {
+          const encodedData = window.location.hash.replace('#trip=', '');
+          const jsonStr = decodeURIComponent(atob(encodedData));
+          const importedTrip = JSON.parse(jsonStr);
+
+          if (importedTrip && importedTrip.id && importedTrip.title) {
+            const existingIdx = trips.findIndex(t => t.id === importedTrip.id);
+            if (existingIdx !== -1) {
+              trips[existingIdx] = importedTrip;
+            } else {
+              trips.unshift(importedTrip);
+            }
+            activeTripId = importedTrip.id;
+            saveTrips();
+            alert(`「${importedTrip.title}」の旅行データを共有URLから読み込みました！`);
+            history.replaceState(null, '', window.location.pathname);
+          }
+        } catch (e) {
+          console.error("共有データのパースに失敗しました", e);
+        }
+      }
+    }
+
+    function shareActiveTrip() {
+      const trip = getCurrentTrip();
+      if (!trip) return;
+
+      try {
+        const jsonStr = JSON.stringify(trip);
+        const encodedData = btoa(encodeURIComponent(jsonStr));
+        const shareURL = `${window.location.origin}${window.location.pathname}#trip=${encodedData}`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareURL).then(() => {
+            alert(`「${trip.title}」の編集用共有URLをクリップボードにコピーしました！\nLINEやメールで友達に送ってください。`);
+          });
+        } else {
+          prompt("以下のURLをコピーして友達に共有してください：", shareURL);
+        }
+      } catch (e) {
+        alert("データの容量が大きすぎるため共有URLを作成できませんでした（画像を減らすとお試しいただけます）。");
+      }
+    }
+
     function saveTrips() {
       localStorage.setItem('my_trips', JSON.stringify(trips));
       localStorage.setItem('active_trip_id', activeTripId);
@@ -165,9 +216,11 @@
               </div>
               <p class="text-xs text-gray-500 mt-1">📍 ${t.destination} ｜ 🗓 ${dur} ｜ 💱 ${currCodes}</p>
             </div>
-            <button onclick="selectTrip('${t.id}')" class="text-xs ${isActive ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'} font-bold px-3 py-1.5 rounded-lg">
-              ${isActive ? '表示中' : '開く'}
-            </button>
+            <div class="flex gap-1.5">
+              <button onclick="selectTrip('${t.id}')" class="text-xs ${isActive ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'} font-bold px-3 py-1.5 rounded-lg">
+                ${isActive ? '表示中' : '開く'}
+              </button>
+            </div>
           </div>
         `;
       }).join('');
@@ -417,8 +470,8 @@
             <p class="text-xs text-blue-100 mt-1">🗓 ${dur} / 👥 ${memberCount}名 (${trip.members ? trip.members.join(', ') : ''})</p>
             <div class="mt-4 flex gap-2">
               <button onclick="switchTab('itinerary')" class="bg-white text-blue-700 text-xs px-4 py-2 rounded-xl font-bold shadow-sm">旅程を見よう</button>
-              <button onclick="switchTab('ai')" class="bg-blue-500/40 border border-white/30 text-white text-xs px-4 py-2 rounded-xl font-bold flex items-center gap-1">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI相談
+              <button onclick="shareActiveTrip()" class="bg-blue-500/40 border border-white/30 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 共有URL作成
               </button>
             </div>
           </div>
@@ -447,7 +500,6 @@
       });
       dayTabsHTML += `</div>`;
 
-      // 現在の日（activeDay）に表示すべき全イベントを収集
       const currentDay = trip.activeDay;
       const dayEvents = [];
 
@@ -455,14 +507,12 @@
         s.events.forEach(evt => {
           const type = evt.type || 'spot';
           if (type === 'hotel') {
-            // 宿泊地：指定された泊数範囲（startDay〜endDay-1）に該当する場合
             const startDay = Number(evt.startDay || 1);
             const endDay = Number(evt.endDay || startDay + 1);
             if (currentDay >= startDay && currentDay < endDay) {
               dayEvents.push(evt);
             }
           } else {
-            // スポット・移動：その日に登録されたもの
             if (s.day === currentDay) {
               dayEvents.push(evt);
             }
@@ -470,7 +520,6 @@
         });
       });
 
-      // 並び替え（宿泊地は必ず最後尾）
       dayEvents.sort((a, b) => {
         const typeA = a.type || 'spot';
         const typeB = b.type || 'spot';
@@ -492,7 +541,6 @@
           const type = evt.type || 'spot';
           const evtCurr = evt.currency || 'JPY';
 
-          // 費用コンパクト表示
           let expenseBadge = '';
           if (evt.expense) {
             let yenVal = Number(evt.expense);
@@ -506,7 +554,6 @@
             }
           }
 
-          // 画像表示
           let imgsHTML = '';
           if (evt.images && evt.images.length > 0) {
             imgsHTML = `<div class="flex gap-1.5 overflow-x-auto mt-2 pb-1">` + 
@@ -515,7 +562,6 @@
           }
 
           if (type === 'hotel') {
-            // 宿泊カード（最下部固定スタイル）
             eventsHTML += `
               <div onclick="openEventModal('${evt.id}')" class="bg-indigo-50/70 border-2 border-indigo-200 p-4 rounded-xl shadow-sm cursor-pointer hover:border-indigo-400 transition space-y-1.5 mt-4">
                 <div class="flex justify-between items-center">
@@ -529,7 +575,6 @@
                 ${imgsHTML}
               </div>`;
           } else if (type === 'move') {
-            // 移動カード
             const timeDisplay = evt.endTime ? `${evt.time || ''} 〜 ${evt.endTime}` : (evt.time || '時間未指定');
             eventsHTML += `
               <div onclick="openEventModal('${evt.id}')" class="bg-amber-50/60 border border-amber-200 p-4 rounded-xl shadow-sm cursor-pointer hover:border-amber-400 transition space-y-1.5">
@@ -549,7 +594,6 @@
                 ${imgsHTML}
               </div>`;
           } else {
-            // スポットカード
             const timeDisplay = evt.endTime ? `${evt.time || '未設定'} 〜 ${evt.endTime}` : (evt.time || '時間未設定');
             eventsHTML += `
               <div onclick="openEventModal('${evt.id}')" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition space-y-1.5">
@@ -585,7 +629,7 @@
       }
     }
 
-    // --- 4. 予定入力・編集モーダル（種別：スポット/宿泊地/移動 対応） ---
+    // --- 4. 予定入力・編集モーダル ---
     let tempEventImages = [];
 
     function openEventModal(eventId = null) {
@@ -649,7 +693,6 @@
         currencyOpts += `<option value="JPY" ${evt.currency === 'JPY' ? 'selected' : ''}>JPY (円)</option>`;
       }
 
-      // 日数選択の生成
       let dayOptionsStart = '', dayOptionsEnd = '';
       for (let d = 1; d <= trip.daysCount; d++) {
         dayOptionsStart += `<option value="${d}" ${Number(evt.startDay) === d ? 'selected' : ''}>Day ${d}</option>`;
@@ -664,7 +707,6 @@
               <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <!-- 種別選択タブ -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">予定の種別</label>
               <div class="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl">
@@ -674,7 +716,6 @@
               </div>
             </div>
 
-            <!-- 1. スポット用入力 -->
             <div id="field-spot" class="space-y-3">
               <div>
                 <label class="block text-xs font-bold text-gray-600 mb-1">スポット名 <span class="text-red-500">*</span></label>
@@ -692,7 +733,6 @@
               </div>
             </div>
 
-            <!-- 2. 宿泊地用入力 -->
             <div id="field-hotel" class="space-y-3 hidden">
               <div>
                 <label class="block text-xs font-bold text-gray-600 mb-1">ホテル・宿泊施設名 <span class="text-red-500">*</span></label>
@@ -714,7 +754,6 @@
               </div>
             </div>
 
-            <!-- 3. 移動用入力 -->
             <div id="field-move" class="space-y-3 hidden">
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -751,7 +790,6 @@
               </select>
             </div>
 
-            <!-- 写真・スクショ添付エリア（最大6枚） -->
             <div>
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs font-bold text-gray-600">予約画面・写真（最大6枚）</label>
@@ -764,7 +802,6 @@
               </button>
             </div>
 
-            <!-- 費用・負担管理 -->
             <div class="border-t border-b py-2 space-y-2 bg-gray-50/50 -mx-5 px-5">
               <span class="text-xs font-bold text-green-700 block">💰 費用・負担管理</span>
               <div class="grid grid-cols-3 gap-2">
@@ -912,7 +949,6 @@
       const trip = getCurrentTrip();
       const currentSchedule = trip.schedule.find(s => s.day === trip.activeDay);
       
-      // 既存のイベントを探して削除（日を跨ぐ可能性があるため全スケジュールから検索）
       trip.schedule.forEach(s => {
         s.events = s.events.filter(e => e.id !== eventId);
       });
@@ -1245,6 +1281,8 @@
       lucide.createIcons();
     }
 
+    // 初期化（URL共有からのアクセスチェックを含む）
+    checkSharedURL();
     switchTab('home');
   </script>
 </body>
