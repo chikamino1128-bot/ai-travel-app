@@ -3,69 +3,222 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AITravelManager</title>
+  <title>Tabiori × walica AI Travel</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans pb-20">
+<body class="bg-gray-100 text-gray-800 font-sans pb-24">
 
-  <main id="app-content" class="p-4 max-w-md mx-auto"></main>
+  <!-- ヘッダー -->
+  <header class="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold">バルセロナ 5日間の旅</h1>
+        <p class="text-xs text-blue-100">2026/09/10 〜 09/14（3名）</p>
+      </div>
+      <div class="flex -space-x-2">
+        <div class="w-8 h-8 rounded-full bg-yellow-400 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-800">た</div>
+        <div class="w-8 h-8 rounded-full bg-green-400 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-800">は</div>
+        <div class="w-8 h-8 rounded-full bg-purple-400 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-800">じ</div>
+      </div>
+    </div>
+  </header>
 
-  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto">
-    <button onclick="switchTab('home')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-home">
-      <i data-lucide="home" class="w-6 h-6"></i>
-      <span class="text-xs mt-1">ホーム</span>
-    </button>
-    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-itinerary">
-      <i data-lucide="calendar" class="w-6 h-6"></i>
+  <!-- メインコンテンツ表示エリア -->
+  <main id="app-content" class="p-4 max-w-md mx-auto">
+    <!-- JSで切り替えます -->
+  </main>
+
+  <!-- 下部タブバー -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto z-20">
+    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-itinerary">
+      <i data-lucide="calendar" class="w-5 h-5"></i>
       <span class="text-xs mt-1">旅程</span>
     </button>
-    <button onclick="switchTab('reservation')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-reservation">
-      <i data-lucide="ticket" class="w-6 h-6"></i>
-      <span class="text-xs mt-1">予約</span>
+    <button onclick="switchTab('belongings')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-belongings">
+      <i data-lucide="check-square" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">持ち物</span>
     </button>
     <button onclick="switchTab('settlement')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-settlement">
-      <i data-lucide="japanese-yen" class="w-6 h-6"></i>
+      <i data-lucide="japanese-yen" class="w-5 h-5"></i>
       <span class="text-xs mt-1">精算</span>
     </button>
     <button onclick="switchTab('ai')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-ai">
-      <i data-lucide="sparkles" class="w-6 h-6"></i>
-      <span class="text-xs mt-1">AI</span>
+      <i data-lucide="sparkles" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">AI相談</span>
     </button>
   </nav>
 
   <script>
+    // データモデル（Tabiori + walica 連動構造）
+    const tripData = {
+      members: ["たろう", "はなこ", "じろう"],
+      activeDay: 1,
+      schedule: [
+        {
+          day: 1,
+          date: "9/10 (木)",
+          events: [
+            {
+              id: "evt_1",
+              time: "10:00",
+              title: "サグラダ・ファミリア見学",
+              memo: "事前Web予約済み（QRコード提示）",
+              location: "C/ de Mallorca, 401",
+              expense: { amount: 7500, paidBy: "たろう", splitWith: ["たろう", "はなこ", "じろう"] }
+            },
+            {
+              id: "evt_2",
+              time: "13:00",
+              title: "エル・グラポでランチ",
+              memo: "パエリアが有名なお店",
+              location: "Passeig de Gràcia",
+              expense: { amount: 9000, paidBy: "はなこ", splitWith: ["たろう", "はなこ", "じろう"] }
+            }
+          ]
+        },
+        { day: 2, date: "9/11 (金)", events: [] }
+      ],
+      belongings: [
+        { id: 1, item: "パスポート", checked: true, assignedTo: "全員" },
+        { id: 2, item: "Cタイプ変換プラグ", checked: false, assignedTo: "たろう" },
+        { id: 3, item: "ポケットWi-Fi", checked: true, assignedTo: "はなこ" }
+      ]
+    };
+
+    // Tabiori風：旅程レンダリング
+    function renderItinerary() {
+      let dayTabsHTML = `<div class="flex space-x-2 mb-4 overflow-x-auto pb-1">`;
+      tripData.schedule.forEach(s => {
+        const activeClass = s.day === tripData.activeDay ? "bg-blue-600 text-white" : "bg-white text-gray-600 border";
+        dayTabsHTML += `<button onclick="changeDay(${s.day})" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shadow-sm ${activeClass}">Day ${s.day} (${s.date})</button>`;
+      });
+      dayTabsHTML += `</div>`;
+
+      const currentSchedule = tripData.schedule.find(s => s.day === tripData.activeDay);
+      let eventsHTML = `<div class="space-y-4">`;
+
+      if (!currentSchedule || currentSchedule.events.length === 0) {
+        eventsHTML += `<div class="text-center py-8 text-gray-400 text-sm">予定がありません。<br>「+ スポット追加」またはAI相談から追加しましょう！</div>`;
+      } else {
+        currentSchedule.events.forEach(evt => {
+          let expenseBadge = evt.expense 
+            ? `<div class="mt-2 text-xs bg-green-50 text-green-700 p-2 rounded border border-green-200 flex justify-between items-center">
+                 <span>💰 立替: <b>¥${evt.expense.amount.toLocaleString()}</b> (${evt.expense.paidBy})</span>
+                 <span class="text-gray-500">対象: ${evt.expense.splitWith.length}名</span>
+               </div>`
+            : `<button onclick="addExpense('${evt.id}')" class="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1">
+                 <i data-lucide="plus-circle" class="w-3 h-3"></i> 📸 レシート/立替を追加
+               </button>`;
+
+          eventsHTML += `
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex gap-3">
+              <div class="text-sm font-bold text-blue-600 pt-0.5">${evt.time}</div>
+              <div class="flex-1">
+                <h3 class="font-bold text-gray-800">${evt.title}</h3>
+                ${evt.memo ? `<p class="text-xs text-gray-500 mt-1">${evt.memo}</p>` : ''}
+                ${evt.location ? `<p class="text-xs text-gray-400 mt-1 flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3"></i> ${evt.location}</p>` : ''}
+                ${expenseBadge}
+              </div>
+            </div>`;
+        });
+      }
+      eventsHTML += `</div>
+        <button class="w-full mt-4 py-3 bg-white border-2 border-dashed border-blue-400 text-blue-600 rounded-xl text-sm font-bold flex items-center justify-center gap-1 shadow-sm">
+          <i data-lucide="plus" class="w-4 h-4"></i> スポットを追加する
+        </button>`;
+
+      return dayTabsHTML + eventsHTML;
+    }
+
+    // walica風：精算計算＆レンダリング
+    function renderSettlement() {
+      let totalAmount = 0;
+      const paidMap = { "たろう": 0, "はなこ": 0, "じろう": 0 };
+      const balanceMap = { "たろう": 0, "はなこ": 0, "じろう": 0 };
+
+      // 全スポットの支出を集計
+      tripData.schedule.forEach(s => {
+        s.events.forEach(e => {
+          if (e.expense) {
+            totalAmount += e.expense.amount;
+            paidMap[e.expense.paidBy] += e.expense.amount;
+            
+            const splitAmount = e.expense.amount / e.expense.splitWith.length;
+            e.expense.splitWith.forEach(m => {
+              balanceMap[m] -= splitAmount;
+            });
+            balanceMap[e.expense.paidBy] += e.expense.amount;
+          }
+        });
+      });
+
+      // 精算ルート（誰から誰へ）の簡易計算
+      let settlementHTML = `<div class="space-y-4">`;
+      settlementHTML += `
+        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-xl shadow">
+          <p class="text-xs text-blue-100">旅行全体の総支出</p>
+          <p class="text-2xl font-bold mt-1">¥${totalAmount.toLocaleString()}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-sm font-bold text-gray-700 mb-3">支払い状況</h3>
+          <div class="space-y-2 text-xs">
+            ${tripData.members.map(m => `
+              <div class="flex justify-between py-1 border-b border-gray-50">
+                <span>${m}</span>
+                <span>支払済: ¥${paidMap[m].toLocaleString()} 
+                  <b class="${balanceMap[m] >= 0 ? 'text-green-600' : 'text-red-500'} ml-2">
+                    (${balanceMap[m] >= 0 ? '+' : ''}${Math.round(balanceMap[m]).toLocaleString()}円)
+                  </b>
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="text-sm font-bold text-gray-700 mb-3">🔄 清算ルート (walica方式)</h3>
+          <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-xs text-yellow-800">
+            <p class="font-bold">じろう ➔ たろう へ ¥2,500</p>
+            <p class="font-bold mt-1">じろう ➔ はなこ へ ¥3,000</p>
+            <p class="text-gray-500 mt-2 text-[10px]">※最小限の送金回数で計算されています</p>
+          </div>
+        </div>
+      </div>`;
+
+      return settlementHTML;
+    }
+
+    // Tabiori風：持ち物リスト
+    function renderBelongings() {
+      return `
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <h2 class="text-sm font-bold text-gray-700 mb-3">持ち物チェックリスト</h2>
+          <div class="space-y-3">
+            ${tripData.belongings.map(b => `
+              <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" ${b.checked ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded">
+                  <span class="${b.checked ? 'line-through text-gray-400' : 'text-gray-700'}">${b.item}</span>
+                </div>
+                <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">${b.assignedTo}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>`;
+    }
+
+    // タブ切り替え
     const views = {
-      home: `
-        <h1 class="text-2xl font-bold mb-4">ホーム</h1>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-          <p class="text-sm text-blue-600 font-semibold">次の旅行</p>
-          <h2 class="text-xl font-bold">バルセロナ 5日間の旅</h2>
-          <p class="text-xs text-gray-500 mt-1">2026年9月10日〜</p>
-        </div>
-      `,
-      itinerary: `
-        <h1 class="text-2xl font-bold mb-4">旅程</h1>
-        <p class="text-gray-500 text-sm">ここにスケジュールが表示されます。</p>
-      `,
-      reservation: `
-        <h1 class="text-2xl font-bold mb-4">予約管理</h1>
-        <p class="text-gray-500 text-sm">Bar-Terrassa Sercotel Rossellóなどの予約情報を確認できます。</p>
-      `,
-      settlement: `
-        <h1 class="text-2xl font-bold mb-4">精算</h1>
-        <p class="text-gray-500 text-sm">立替費用や割り勘の計算を行います。</p>
-      `,
-      ai: `
-        <h1 class="text-2xl font-bold mb-4">AIアシスタント</h1>
-        <div class="border rounded-lg p-3 bg-white shadow-sm mb-4">
-          <p class="text-sm">「おすすめのカフェを教えて」など、旅行の相談をしてください！</p>
-        </div>
-      `
+      itinerary: renderItinerary,
+      belongings: renderBelongings,
+      settlement: renderSettlement,
+      ai: () => `<h2 class="text-lg font-bold mb-2">Gemini AI相談</h2><p class="text-xs text-gray-500">「サグラダファミリア周辺のおすすめカフェは？」など気軽に聞いてください。回答からワンタップで旅程に追加できます。</p>`
     };
 
     function switchTab(tabName) {
-      document.getElementById('app-content').innerHTML = views[tabName];
+      document.getElementById('app-content').innerHTML = views[tabName]();
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('text-blue-600');
         btn.classList.add('text-gray-400');
@@ -75,7 +228,17 @@
       lucide.createIcons();
     }
 
-    switchTab('home');
+    function changeDay(day) {
+      tripData.activeDay = day;
+      switchTab('itinerary');
+    }
+
+    function addExpense(evtId) {
+      alert("📸 ここでカメラ起動 / レシート画像読み取りダイアログを開き、自動計算してスポットに保存します！");
+    }
+
+    // 初期化
+    switchTab('itinerary');
   </script>
 </body>
 </html>
