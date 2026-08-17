@@ -67,6 +67,8 @@
         nightsText: "2泊3日",
         daysCount: 3,
         members: ["たろう", "はなこ"],
+        currency: "CNY",
+        exchangeRate: 21.5, // 1 CNY = 21.5 JPY
         activeDay: 1,
         schedule: [
           {
@@ -76,12 +78,27 @@
               {
                 id: "evt_101",
                 time: "10:00",
-                title: "パーク入園",
+                endTime: "20:00",
+                title: "パーク入園チケット",
                 url: "https://www.shanghaidisneyresort.com/",
                 memo: "チケット画面を事前に準備しておくこと",
                 bookingStatus: "reserved",
-                expense: 18000,
+                expense: 950,
+                currency: "CNY",
                 paidBy: "たろう",
+                forMembers: ["たろう", "はなこ"]
+              },
+              {
+                id: "evt_102",
+                time: "12:30",
+                endTime: "13:30",
+                title: "事前カード決済ホテル代",
+                url: "",
+                memo: "日本で事前決済済み",
+                bookingStatus: "reserved",
+                expense: 15000,
+                currency: "JPY",
+                paidBy: "はなこ",
                 forMembers: ["たろう", "はなこ"]
               }
             ]
@@ -94,7 +111,7 @@
           { id: 2, item: "変圧器", checked: false }
         ],
         chatHistory: [
-          { sender: 'ai', text: 'こんにちは！旅行特化AIです。旅程のアドバイスやおすすめスポット、持ち物の追加提案などお任せください！' }
+          { sender: 'ai', text: 'こんにちは！旅行特化AIです。何でもご相談ください！' }
         ]
       }
     ];
@@ -130,6 +147,7 @@
         const isActive = t.id === activeTripId;
         const memberCount = t.members ? t.members.length : 1;
         const dur = t.nightsText || `${t.daysCount}日間`;
+        const curr = t.currency || 'JPY';
         return `
           <div class="bg-white p-4 rounded-xl border ${isActive ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'} shadow-sm mb-3 flex justify-between items-center">
             <div>
@@ -137,7 +155,7 @@
                 <h3 class="font-bold text-gray-800">${t.title}</h3>
                 ${isActive ? '<span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">選択中</span>' : ''}
               </div>
-              <p class="text-xs text-gray-500 mt-1">📍 ${t.destination} ｜ 🗓 ${dur} ｜ 👥 ${memberCount}名</p>
+              <p class="text-xs text-gray-500 mt-1">📍 ${t.destination} ｜ 🗓 ${dur} ｜ 💱 ${curr}</p>
             </div>
             <button onclick="selectTrip('${t.id}')" class="text-xs ${isActive ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'} font-bold px-3 py-1.5 rounded-lg">
               ${isActive ? '表示中' : '開く'}
@@ -166,12 +184,31 @@
             
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">旅行タイトル</label>
-              <input id="new-title" type="text" placeholder="例：上海ディズニー" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              <input id="new-title" type="text" placeholder="例：上海ディズニー旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
 
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">行き先</label>
               <input id="new-destination" type="text" placeholder="例：上海" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">メイン通貨</label>
+                <select id="new-currency" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500" onchange="toggleCustomRateInput()">
+                  <option value="JPY">日本円 (JPY)</option>
+                  <option value="USD">米ドル (USD)</option>
+                  <option value="EUR">ユーロ (EUR)</option>
+                  <option value="CNY" selected>中国元 (CNY)</option>
+                  <option value="KRW">韓国ウォン (KRW)</option>
+                  <option value="TWD">台湾ドル (TWD)</option>
+                  <option value="THB">タイバーツ (THB)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">1外貨＝約何円？(レート)</label>
+                <input id="new-rate" type="number" step="0.01" value="21.5" placeholder="例: 21.5" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
@@ -197,15 +234,12 @@
                 <option value="3">3名</option>
                 <option value="4">4名</option>
                 <option value="5">5名</option>
-                <option value="6">6名</option>
               </select>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">メンバーの名前</label>
-              <div id="member-inputs-container" class="space-y-1.5">
-                <!-- 動的に作成 -->
-              </div>
+              <div id="member-inputs-container" class="space-y-1.5"></div>
             </div>
 
             <div class="flex gap-2 pt-2 border-t">
@@ -217,6 +251,23 @@
       `;
       document.getElementById('modal-container').innerHTML = html;
       updateMemberInputs();
+    }
+
+    function toggleCustomRateInput() {
+      const curr = document.getElementById('new-currency').value;
+      const rateInput = document.getElementById('new-rate');
+      if (curr === 'JPY') {
+        rateInput.value = '1';
+        rateInput.disabled = true;
+      } else {
+        rateInput.disabled = false;
+        if (curr === 'USD') rateInput.value = '155.0';
+        else if (curr === 'EUR') rateInput.value = '165.0';
+        else if (curr === 'CNY') rateInput.value = '21.5';
+        else if (curr === 'KRW') rateInput.value = '0.11';
+        else if (curr === 'TWD') rateInput.value = '4.8';
+        else if (curr === 'THB') rateInput.value = '4.3';
+      }
     }
 
     function calculateNights() {
@@ -246,7 +297,6 @@
     function updateMemberInputs() {
       const count = parseInt(document.getElementById('new-member-count').value);
       const container = document.getElementById('member-inputs-container');
-      
       let html = '';
       for (let i = 1; i <= count; i++) {
         const defaultName = i === 1 ? '自分' : `メンバー${i}`;
@@ -258,6 +308,8 @@
     function createNewTrip() {
       const title = document.getElementById('new-title').value.trim() || '無題の旅行';
       const destination = document.getElementById('new-destination').value.trim() || '未定';
+      const currency = document.getElementById('new-currency').value;
+      const exchangeRate = parseFloat(document.getElementById('new-rate').value) || 1;
       const startDate = document.getElementById('new-start-date').value || '';
       const endDate = document.getElementById('new-end-date').value || '';
       
@@ -276,6 +328,8 @@
         id: 'trip_' + Date.now(),
         title,
         destination,
+        currency,
+        exchangeRate,
         startDate,
         endDate,
         nightsText: text,
@@ -284,11 +338,11 @@
         activeDay: 1,
         schedule,
         belongings: [
-          { id: 1, item: "着替え", checked: false },
+          { id: 1, item: "パスポート", checked: false },
           { id: 2, item: "充電器", checked: false }
         ],
         chatHistory: [
-          { sender: 'ai', text: `「${title}」の計画ですね！何でもご相談ください！` }
+          { sender: 'ai', text: `「${title}」の計画ですね！通貨は ${currency} で設定しました。` }
         ]
       };
 
@@ -320,7 +374,10 @@
       return `
         <div class="space-y-4">
           <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg">
-            <span class="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-semibold">📍 ${trip.destination}</span>
+            <div class="flex justify-between items-start">
+              <span class="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-semibold">📍 ${trip.destination}</span>
+              <span class="text-[10px] bg-yellow-400 text-gray-900 font-bold px-2 py-0.5 rounded-full">💱 1 ${trip.currency || 'JPY'} = ${trip.exchangeRate || 1} JPY</span>
+            </div>
             <h2 class="text-xl font-bold mt-2">${trip.title}</h2>
             <p class="text-xs text-blue-100 mt-1">🗓 ${dur} / 👥 ${memberCount}名 (${trip.members ? trip.members.join(', ') : ''})</p>
             <div class="mt-4 flex gap-2">
@@ -367,11 +424,24 @@
       } else {
         currentSchedule.events.forEach(evt => {
           const forMemText = evt.forMembers && evt.forMembers.length > 0 ? evt.forMembers.join(', ') : '全員';
+          const timeDisplay = evt.endTime ? `${evt.time || '未設定'} 〜 ${evt.endTime}` : (evt.time || '時間未設定');
+          const evtCurr = evt.currency || trip.currency || 'JPY';
+
+          // 円換算表示の事前計算
+          let yenCalcText = "";
+          if (evt.expense) {
+            if (evtCurr === 'JPY') {
+              yenCalcText = `(¥${Number(evt.expense).toLocaleString()})`;
+            } else {
+              const yenVal = Math.round(Number(evt.expense) * (trip.exchangeRate || 1));
+              yenCalcText = `(約 ¥${yenVal.toLocaleString()})`;
+            }
+          }
 
           eventsHTML += `
             <div onclick="openEventModal('${evt.id}')" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition">
               <div class="flex justify-between items-center mb-1">
-                <span class="text-xs font-bold text-blue-600">🕒 ${evt.time || '時間未設定'}</span>
+                <span class="text-xs font-bold text-blue-600">🕒 ${timeDisplay}</span>
                 ${getBookingBadge(evt.bookingStatus)}
               </div>
               <h3 class="font-bold text-gray-800 text-base">${evt.title}</h3>
@@ -382,7 +452,7 @@
               ${evt.expense ? `
                 <div class="mt-2 text-xs bg-green-50 text-green-700 p-2.5 rounded border border-green-200 space-y-1">
                   <div class="flex justify-between items-center font-bold">
-                    <span>💰 費用: ¥${Number(evt.expense).toLocaleString()}</span>
+                    <span>💰 費用: ${evtCurr} ${Number(evt.expense).toLocaleString()} <span class="text-[11px] font-normal text-green-600">${yenCalcText}</span></span>
                     <span>支払者: ${evt.paidBy || '未設定'}</span>
                   </div>
                   <div class="text-[11px] text-green-600 border-t border-green-200/60 pt-1">
@@ -410,19 +480,21 @@
       }
     }
 
-    // --- 4. 予定入力・編集モーダル（ワリカ機能＆住所/電話削除対応） ---
+    // --- 4. 予定入力・編集モーダル（通貨選択対応） ---
     function openEventModal(eventId = null) {
       const trip = getCurrentTrip();
       const currentSchedule = trip.schedule.find(s => s.day === trip.activeDay);
       
       let evt = {
         id: 'evt_' + Date.now(),
-        time: '12:00',
+        time: '10:00',
+        endTime: '12:00',
         title: '',
         url: '',
         memo: '',
         bookingStatus: 'unnecessary',
         expense: '',
+        currency: trip.currency || 'JPY',
         paidBy: trip.members ? trip.members[0] : '自分',
         forMembers: trip.members ? [...trip.members] : ['自分']
       };
@@ -431,6 +503,7 @@
         const found = currentSchedule.events.find(e => e.id === eventId);
         if (found) {
           evt = { ...found };
+          if (!evt.currency) evt.currency = trip.currency || 'JPY';
           if (!evt.forMembers) evt.forMembers = trip.members ? [...trip.members] : ['自分'];
         }
       }
@@ -449,6 +522,8 @@
         `;
       }).join('');
 
+      const mainCurr = trip.currency || 'CNY';
+
       const html = `
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div class="bg-white p-5 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md my-8 space-y-3">
@@ -459,37 +534,50 @@
 
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">スポット名 / 予定 <span class="text-red-500">*</span></label>
-              <input id="evt-title" type="text" value="${evt.title}" placeholder="例：上海ディズニー、御宿 一富士" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              <input id="evt-title" type="text" value="${evt.title}" placeholder="例：上海ディズニー、レストラン" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-xs font-bold text-gray-600 mb-1">時間</label>
-                <input id="evt-time" type="time" value="${evt.time}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                <label class="block text-xs font-bold text-gray-600 mb-1">開始時間</label>
+                <input id="evt-time" type="time" value="${evt.time || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
               </div>
               <div>
-                <label class="block text-xs font-bold text-gray-600 mb-1">予約の有無</label>
-                <select id="evt-booking" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
-                  <option value="unnecessary" ${evt.bookingStatus === 'unnecessary' ? 'selected' : ''}>予約不要</option>
-                  <option value="reserved" ${evt.bookingStatus === 'reserved' ? 'selected' : ''}>✅ 予約済み</option>
-                  <option value="unreserved" ${evt.bookingStatus === 'unreserved' ? 'selected' : ''}>⚠️ 予約未完了（要予約）</option>
-                </select>
+                <label class="block text-xs font-bold text-gray-600 mb-1">終了時間</label>
+                <input id="evt-end-time" type="time" value="${evt.endTime || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
               </div>
             </div>
 
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">予約の有無</label>
+              <select id="evt-booking" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                <option value="unnecessary" ${evt.bookingStatus === 'unnecessary' ? 'selected' : ''}>予約不要</option>
+                <option value="reserved" ${evt.bookingStatus === 'reserved' ? 'selected' : ''}>✅ 予約済み</option>
+                <option value="unreserved" ${evt.bookingStatus === 'unreserved' ? 'selected' : ''}>⚠️ 予約未完了（要予約）</option>
+              </select>
+            </div>
+
             <div class="border-t border-b py-2 space-y-2 bg-gray-50/50 -mx-5 px-5">
-              <span class="text-xs font-bold text-green-700 block">💰 費用・ワリカ設定</span>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った費用 (円)</label>
-                  <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：18000" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
-                </div>
-                <div>
-                  <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った人</label>
-                  <select id="evt-paidBy" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
-                    ${memberPaidOptions}
+              <span class="text-xs font-bold text-green-700 block">💰 費用・負担管理</span>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="col-span-1">
+                  <label class="block text-[11px] font-bold text-gray-600 mb-1">通貨</label>
+                  <select id="evt-currency" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                    <option value="${mainCurr}" ${evt.currency === mainCurr ? 'selected' : ''}>${mainCurr}</option>
+                    <option value="JPY" ${evt.currency === 'JPY' ? 'selected' : ''}>JPY (円)</option>
                   </select>
                 </div>
+                <div class="col-span-2">
+                  <label class="block text-[11px] font-bold text-gray-600 mb-1">金額</label>
+                  <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：950" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った人</label>
+                <select id="evt-paidBy" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                  ${memberPaidOptions}
+                </select>
               </div>
 
               <div>
@@ -538,8 +626,10 @@
         id: eventId,
         title,
         time: document.getElementById('evt-time').value,
+        endTime: document.getElementById('evt-end-time').value,
         bookingStatus: document.getElementById('evt-booking').value,
         expense: document.getElementById('evt-expense').value,
+        currency: document.getElementById('evt-currency').value,
         paidBy: document.getElementById('evt-paidBy').value,
         forMembers: selectedForMembers,
         url: document.getElementById('evt-url').value.trim(),
@@ -570,80 +660,146 @@
       switchTab('itinerary');
     }
 
-    // --- 5. 精算画面（ワリカ精算計算） ---
+    // --- 5. 精算画面（現地通貨・日本円換算 両対応） ---
+    function updateExchangeRate(newRate) {
+      const trip = getCurrentTrip();
+      if (trip) {
+        trip.exchangeRate = parseFloat(newRate) || 1;
+        saveTrips();
+        switchTab('settlement');
+      }
+    }
+
     function renderSettlement() {
       const trip = getCurrentTrip();
       if (!trip) return '';
 
       const members = trip.members || ['自分'];
-      let totalExpense = 0;
+      const mainCurr = trip.currency || 'JPY';
+      const rate = trip.exchangeRate || 1;
+
+      // 通貨ごとの集計オブジェクト
+      // { JPY: { total: 0, paid: {m:0}, share: {m:0} }, [mainCurr]: { total: 0, paid: {m:0}, share: {m:0} } }
+      const currList = mainCurr === 'JPY' ? ['JPY'] : [mainCurr, 'JPY'];
       
-      // 各自の「払った額」と「負担すべき額」を計算
-      const paidMap = {};
-      const shareMap = {};
-      members.forEach(m => {
-        paidMap[m] = 0;
-        shareMap[m] = 0;
+      const stats = {};
+      currList.forEach(c => {
+        stats[c] = {
+          total: 0,
+          paid: {},
+          share: {}
+        };
+        members.forEach(m => {
+          stats[c].paid[m] = 0;
+          stats[c].share[m] = 0;
+        });
       });
 
+      // 旅程データから集計
       trip.schedule.forEach(s => {
         s.events.forEach(e => {
           if (e.expense) {
             const amt = Number(e.expense);
-            totalExpense += amt;
+            const c = e.currency || mainCurr;
 
-            if (e.paidBy && paidMap[e.paidBy] !== undefined) {
-              paidMap[e.paidBy] += amt;
+            if (!stats[c]) {
+              stats[c] = { total: 0, paid: {}, share: {} };
+              members.forEach(m => { stats[c].paid[m] = 0; stats[c].share[m] = 0; });
+            }
+
+            stats[c].total += amt;
+
+            if (e.paidBy && stats[c].paid[e.paidBy] !== undefined) {
+              stats[c].paid[e.paidBy] += amt;
             }
 
             const targetMembers = e.forMembers && e.forMembers.length > 0 ? e.forMembers : members;
             const splitAmt = amt / targetMembers.length;
             targetMembers.forEach(tm => {
-              if (shareMap[tm] !== undefined) {
-                shareMap[tm] += splitAmt;
+              if (stats[c].share[tm] !== undefined) {
+                stats[c].share[tm] += splitAmt;
               }
             });
           }
         });
       });
 
+      // 各メンバーの「通貨別収支」と「円換算合計収支」を計算
       const memberDetailsHTML = members.map(m => {
-        const paid = paidMap[m] || 0;
-        const share = shareMap[m] || 0;
-        const diff = paid - share;
+        let diffJpyTotal = 0;
+        let currencyBreakdownHTML = '';
 
-        let diffBadge = '';
-        if (diff > 0) {
-          diffBadge = `<span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">＋¥${Math.round(diff).toLocaleString()} (もらう)</span>`;
-        } else if (diff < 0) {
-          diffBadge = `<span class="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">－¥${Math.abs(Math.round(diff)).toLocaleString()} (払う)</span>`;
+        currList.forEach(c => {
+          const paid = stats[c].paid[m] || 0;
+          const share = stats[c].share[m] || 0;
+          const diff = paid - share;
+
+          // 円換算加算
+          const rateMultiplier = (c === 'JPY') ? 1 : rate;
+          diffJpyTotal += (diff * rateMultiplier);
+
+          if (paid > 0 || share > 0) {
+            const diffSign = diff > 0 ? `＋${c} ${Math.round(diff).toLocaleString()}` : (diff < 0 ? `－${c} ${Math.abs(Math.round(diff)).toLocaleString()}` : `${c} 0`);
+            const diffColor = diff > 0 ? 'text-green-600' : (diff < 0 ? 'text-red-600' : 'text-gray-500');
+
+            currencyBreakdownHTML += `
+              <div class="text-[11px] text-gray-600 flex justify-between items-center border-t border-gray-100 pt-1 mt-1">
+                <span><b>${c}</b> (立替: ${Math.round(paid)} / 負担: ${Math.round(share)})</span>
+                <span class="font-bold ${diffColor}">${diffSign}</span>
+              </div>
+            `;
+          }
+        });
+
+        let finalBadge = '';
+        if (Math.round(diffJpyTotal) > 0) {
+          finalBadge = `<span class="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">最終: ＋¥${Math.round(diffJpyTotal).toLocaleString()} (受取)</span>`;
+        } else if (Math.round(diffJpyTotal) < 0) {
+          finalBadge = `<span class="text-xs font-bold text-red-700 bg-red-100 px-2.5 py-1 rounded-full">最終: －¥${Math.abs(Math.round(diffJpyTotal)).toLocaleString()} (支払)</span>`;
         } else {
-          diffBadge = `<span class="text-xs font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded">¥0 (清算なし)</span>`;
+          finalBadge = `<span class="text-xs font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">最終: ¥0 (清算なし)</span>`;
         }
 
         return `
-          <div class="bg-white p-3 rounded-xl border border-gray-100 shadow-sm space-y-1">
-            <div class="flex justify-between items-center">
-              <span class="font-bold text-gray-800 text-sm">${m}</span>
-              ${diffBadge}
+          <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-1.5">
+            <div class="flex justify-between items-center border-b pb-1.5">
+              <span class="font-bold text-gray-800 text-sm">👤 ${m}</span>
+              ${finalBadge}
             </div>
-            <div class="text-[11px] text-gray-500 flex justify-between pt-1 border-t border-gray-50">
-              <span>支払済: ¥${paid.toLocaleString()}</span>
-              <span>自分の負担額: ¥${Math.round(share).toLocaleString()}</span>
-            </div>
+            ${currencyBreakdownHTML || '<p class="text-[11px] text-gray-400">登録された費用はありません</p>'}
           </div>
         `;
       }).join('');
 
+      // レート調整エリア
+      const rateSettingHTML = mainCurr !== 'JPY' ? `
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex justify-between items-center text-xs">
+          <div>
+            <span class="font-bold text-yellow-900 block">💱 為替レート設定</span>
+            <span class="text-[11px] text-yellow-700">1 ${mainCurr} ＝ 何円で計算する？</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <input type="number" step="0.1" value="${rate}" onchange="updateExchangeRate(this.value)" class="w-16 border rounded p-1 text-center text-sm font-bold bg-white focus:outline-none focus:border-blue-500">
+            <span class="font-bold text-yellow-900">円</span>
+          </div>
+        </div>
+      ` : '';
+
       return `
         <div class="space-y-4">
-          <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-xl shadow">
-            <p class="text-xs text-blue-100">旅程に登録された総費用</p>
-            <p class="text-2xl font-bold mt-1">¥${totalExpense.toLocaleString()}</p>
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow">
+            <p class="text-xs text-blue-100">旅程に登録された総費用（円換算合計）</p>
+            <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round((stats[mainCurr]?.total || 0) * rate + (stats['JPY']?.total || 0)).toLocaleString()}</p>
+            <div class="text-[11px] text-blue-100 mt-2 flex gap-3 border-t border-blue-400/50 pt-1.5">
+              ${mainCurr !== 'JPY' ? `<span>${mainCurr}: <b>${(stats[mainCurr]?.total || 0).toLocaleString()}</b></span>` : ''}
+              <span>JPY: <b>¥${(stats['JPY']?.total || 0).toLocaleString()}</b></span>
+            </div>
           </div>
 
-          <h3 class="text-xs font-bold text-gray-500 uppercase">ワリカ精算状況（精算バランス）</h3>
-          <div class="space-y-2">
+          ${rateSettingHTML}
+
+          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">メンバー別 精算バランス</h3>
+          <div class="space-y-2.5">
             ${memberDetailsHTML}
           </div>
         </div>`;
