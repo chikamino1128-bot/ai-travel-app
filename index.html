@@ -31,7 +31,11 @@
 
   <!-- 下部タブバー -->
   <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto z-20">
-    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-itinerary">
+    <button onclick="switchTab('home')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-home">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">ホーム</span>
+    </button>
+    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-itinerary">
       <i data-lucide="calendar" class="w-5 h-5"></i>
       <span class="text-xs mt-1">旅程</span>
     </button>
@@ -50,7 +54,6 @@
   </nav>
 
   <script>
-    // データモデル（Tabiori + walica 連動構造）
     const tripData = {
       members: ["たろう", "はなこ", "じろう"],
       activeDay: 1,
@@ -86,7 +89,29 @@
       ]
     };
 
-    // Tabiori風：旅程レンダリング
+    // ホーム表示
+    function renderHome() {
+      return `
+        <div class="space-y-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <p class="text-xs text-blue-600 font-semibold">次の旅行</p>
+            <h2 class="text-xl font-bold text-gray-800">バルセロナ 5日間の旅</h2>
+            <p class="text-xs text-gray-500 mt-1">2026年9月10日〜9月14日</p>
+            <div class="mt-3 flex gap-2">
+              <button onclick="switchTab('itinerary')" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">旅程を見る</button>
+              <button onclick="switchTab('settlement')" class="bg-white border text-gray-700 text-xs px-3 py-1.5 rounded-lg font-bold">精算状況</button>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-sm font-bold text-gray-700 mb-2">クイックメモ</h3>
+            <p class="text-xs text-gray-500">ホテルの予約番号や非常連絡先などをここに表示できます。</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // 旅程表示
     function renderItinerary() {
       let dayTabsHTML = `<div class="flex space-x-2 mb-4 overflow-x-auto pb-1">`;
       tripData.schedule.forEach(s => {
@@ -131,13 +156,12 @@
       return dayTabsHTML + eventsHTML;
     }
 
-    // walica風：精算計算＆レンダリング
+    // 精算表示
     function renderSettlement() {
       let totalAmount = 0;
       const paidMap = { "たろう": 0, "はなこ": 0, "じろう": 0 };
       const balanceMap = { "たろう": 0, "はなこ": 0, "じろう": 0 };
 
-      // 全スポットの支出を集計
       tripData.schedule.forEach(s => {
         s.events.forEach(e => {
           if (e.expense) {
@@ -153,7 +177,6 @@
         });
       });
 
-      // 精算ルート（誰から誰へ）の簡易計算
       let settlementHTML = `<div class="space-y-4">`;
       settlementHTML += `
         <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-xl shadow">
@@ -190,7 +213,7 @@
       return settlementHTML;
     }
 
-    // Tabiori風：持ち物リスト
+    // 持ち物表示
     function renderBelongings() {
       return `
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
@@ -209,8 +232,8 @@
         </div>`;
     }
 
-    // タブ切り替え
     const views = {
+      home: renderHome,
       itinerary: renderItinerary,
       belongings: renderBelongings,
       settlement: renderSettlement,
@@ -237,8 +260,7 @@
       alert("📸 ここでカメラ起動 / レシート画像読み取りダイアログを開き、自動計算してスポットに保存します！");
     }
 
-    // 初期化
-    switchTab('itinerary');
+    switchTab('home');
   </script>
 </body>
 </html>
