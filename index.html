@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AITravelManager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans pb-20">
+
+  <main id="app-content" class="p-4 max-w-md mx-auto"></main>
+
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto">
+    <button onclick="switchTab('home')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-home">
+      <i data-lucide="home" class="w-6 h-6"></i>
+      <span class="text-xs mt-1">ホーム</span>
+    </button>
+    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-itinerary">
+      <i data-lucide="calendar" class="w-6 h-6"></i>
+      <span class="text-xs mt-1">旅程</span>
+    </button>
+    <button onclick="switchTab('reservation')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-reservation">
+      <i data-lucide="ticket" class="w-6 h-6"></i>
+      <span class="text-xs mt-1">予約</span>
+    </button>
+    <button onclick="switchTab('settlement')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-settlement">
+      <i data-lucide="japanese-yen" class="w-6 h-6"></i>
+      <span class="text-xs mt-1">精算</span>
+    </button>
+    <button onclick="switchTab('ai')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-ai">
+      <i data-lucide="sparkles" class="w-6 h-6"></i>
+      <span class="text-xs mt-1">AI</span>
+    </button>
+  </nav>
+
+  <script>
+    const views = {
+      home: `
+        <h1 class="text-2xl font-bold mb-4">ホーム</h1>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <p class="text-sm text-blue-600 font-semibold">次の旅行</p>
+          <h2 class="text-xl font-bold">バルセロナ 5日間の旅</h2>
+          <p class="text-xs text-gray-500 mt-1">2026年9月10日〜</p>
+        </div>
+      `,
+      itinerary: `
+        <h1 class="text-2xl font-bold mb-4">旅程</h1>
+        <p class="text-gray-500 text-sm">ここにスケジュールが表示されます。</p>
+      `,
+      reservation: `
+        <h1 class="text-2xl font-bold mb-4">予約管理</h1>
+        <p class="text-gray-500 text-sm">Bar-Terrassa Sercotel Rossellóなどの予約情報を確認できます。</p>
+      `,
+      settlement: `
+        <h1 class="text-2xl font-bold mb-4">精算</h1>
+        <p class="text-gray-500 text-sm">立替費用や割り勘の計算を行います。</p>
+      `,
+      ai: `
+        <h1 class="text-2xl font-bold mb-4">AIアシスタント</h1>
+        <div class="border rounded-lg p-3 bg-white shadow-sm mb-4">
+          <p class="text-sm">「おすすめのカフェを教えて」など、旅行の相談をしてください！</p>
+        </div>
+      `
+    };
+
+    function switchTab(tabName) {
+      document.getElementById('app-content').innerHTML = views[tabName];
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-blue-600');
+        btn.classList.add('text-gray-400');
+      });
+      document.getElementById(`tab-${tabName}`).classList.remove('text-gray-400');
+      document.getElementById(`tab-${tabName}`).classList.add('text-blue-600');
+      lucide.createIcons();
+    }
+
+    switchTab('home');
+  </script>
+</body>
+</html>
