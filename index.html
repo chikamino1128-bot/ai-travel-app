@@ -87,9 +87,9 @@
         endDate: "2026-09-21",
         nightsText: "2泊3日",
         daysCount: 3,
-        members: ["自分", "メンバー2"],
-        currencyCode: "USD",
-        currencyRate: 150.0,
+        members: ["たろう", "はなこ"],
+        currencyCode: "EUR",
+        currencyRate: 160.0,
         activeDay: 1,
         schedule: [
           { day: 1, date: "1日目", events: [] },
@@ -108,6 +108,8 @@
 
     let trips = JSON.parse(localStorage.getItem('my_trips')) || defaultTrips;
     let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
+    // 明細アコーディオンの開閉状態を保持するオブジェクト
+    let openAccordions = {};
 
     function checkSharedURL() {
       if (window.location.hash.startsWith('#trip=')) {
@@ -967,9 +969,17 @@
       switchTab('itinerary');
     }
 
-    // 精算ルート計算ヘルパー関数
-    function calculateTransfersForCurrency(members, targetCurrency, trip) {
-      const paidMap = {}, shareMap = {};
+    // --- 新・精算データ計算ヘルパー関数 ---
+    function calculateSettlementData(members, targetCurrency, trip) {
+      const memberTotals = {};
+      const memberItems = {};
+      members.forEach(m => {
+        memberTotals[m] = 0;
+        memberItems[m] = [];
+      });
+
+      const paidMap = {};
+      const shareMap = {};
       members.forEach(m => { paidMap[m] = 0; shareMap[m] = 0; });
 
       let grandTotal = 0;
@@ -981,11 +991,11 @@
           const curr = e.currency || 'JPY';
 
           let effectiveAmount = 0;
-          if (targetCurrency === 'JPY_ONLY') {
+          if (targetCurrency === 'JPY') {
             if (curr === 'JPY') effectiveAmount = exp;
-          } else if (targetCurrency === 'FOREIGN_ONLY') {
+          } else if (targetCurrency === 'FOREIGN') {
             if (curr === trip.currencyCode) effectiveAmount = exp;
-          } else if (targetCurrency === 'CONVERTED_TOTAL') {
+          } else if (targetCurrency === 'CONVERTED') {
             if (curr === 'JPY') effectiveAmount = exp;
             else if (trip.currencyRate > 0) effectiveAmount = exp * trip.currencyRate;
           }
@@ -993,6 +1003,16 @@
           if (effectiveAmount > 0) {
             grandTotal += effectiveAmount;
             const payer = e.paidBy || members[0];
+            if (memberTotals[payer] !== undefined) {
+              memberTotals[payer] += effectiveAmount;
+              memberItems[payer].push({
+                date: `Day ${s.day}`,
+                title: e.title || (e.fromLoc ? `${e.fromLoc}➔${e.toLoc}` : '立替'),
+                amount: effectiveAmount,
+                origCurrency: curr
+              });
+            }
+
             if (paidMap[payer] !== undefined) paidMap[payer] += effectiveAmount;
 
             const targets = (e.forMembers && e.forMembers.length > 0) ? e.forMembers : members;
@@ -1002,6 +1022,7 @@
         });
       });
 
+      // 精算ルート計算
       const balances = members.map(m => ({
         name: m,
         balance: paidMap[m] - shareMap[m]
@@ -1029,81 +1050,134 @@
         if (cred.balance <= 0.01) cIdx++;
       }
 
-      return { grandTotal, transfers };
+      return { grandTotal, memberTotals, memberItems, transfers };
     }
 
-    // --- 精算画面レンダー ---
+    function toggleAccordion(id) {
+      openAccordions[id] = !openAccordions[id];
+      switchTab('settlement');
+    }
+
+    // --- 精算画面レンダー（UI刷新版） ---
     function renderSettlement() {
       const trip = getCurrentTrip();
       if (!trip) return '';
 
       const members = trip.members || ['自分'];
       const foreignCode = trip.currencyCode ? trip.currencyCode.toUpperCase() : null;
+      const rate = trip.currencyRate || 0;
 
-      // 1. JPYのみの精算
-      const jpyResult = calculateTransfersForCurrency(members, 'JPY_ONLY', trip);
-      // 2. 海外通貨のみの精算
-      const foreignResult = foreignCode ? calculateTransfersForCurrency(members, 'FOREIGN_ONLY', trip) : null;
-      // 3. 円換算（合算）の精算
-      const convertedResult = foreignCode ? calculateTransfersForCurrency(members, 'CONVERTED_TOTAL', trip) : null;
+      const jpyData = calculateSettlementData(members, 'JPY', trip);
+      const foreignData = foreignCode ? calculateSettlementData(members, 'FOREIGN', trip) : null;
+      const convertedData = foreignCode ? calculateSettlementData(members, 'CONVERTED', trip) : null;
 
-      function renderTransferCards(transfers, symbol) {
-        if (!transfers || transfers.length === 0) {
-          return `<p class="text-xs text-gray-400 italic py-1">精算の必要はありません</p>`;
-        }
-        return transfers.map(t => `
-          <div class="bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl flex justify-between items-center text-xs mb-1.5">
-            <div class="font-bold text-amber-900">
-              <span>${t.from}</span> <span class="text-amber-500">➔</span> <span>${t.to}</span>
+      // ヘルパー：金額フォーマット
+      const fmt = (val, symbol = '¥') => {
+        if (symbol === '¥') return `¥ ${Math.round(val).toLocaleString()}`;
+        return `${symbol} ${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+      };
+
+      // ヘルパー：メンバー明細ブロック構築
+      const renderMemberBlocks = (currencyKey, data, symbol, themeColor) => {
+        return members.map(m => {
+          const accId = `${currencyKey}-${m}`;
+          const isOpen = !!openAccordions[accId];
+          const total = data.memberTotals[m] || 0;
+          const items = data.memberItems[m] || [];
+
+          const textColor = themeColor === 'blue' ? 'text-blue-500 hover:text-blue-700' : 'text-emerald-600 hover:text-emerald-800';
+
+          return `
+            <div class="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-semibold text-gray-700 text-sm">${m}</span>
+                <span class="font-bold text-gray-900 text-sm">${fmt(total, symbol)}</span>
+              </div>
+              
+              <button onclick="toggleAccordion('${accId}')" class="text-xs ${textColor} flex items-center gap-1 focus:outline-none">
+                <span>${isOpen ? '▲ 明細を閉じる' : '▼ タップして支払項目を表示'}</span>
+              </button>
+
+              ${isOpen ? `
+                <ul class="mt-2 text-xs bg-gray-50 rounded p-2 space-y-1 border border-gray-100">
+                  ${items.length === 0 ? '<li class="text-gray-400 italic">支払記録はありません</li>' : ''}
+                  ${items.map(item => `
+                    <li class="flex justify-between text-gray-600">
+                      <span>${item.date} ${item.title}</span>
+                      <span class="font-mono">${fmt(item.amount, symbol)}</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              ` : ''}
             </div>
-            <span class="font-extrabold text-amber-800 text-sm">${symbol}${Math.round(t.amount).toLocaleString()}</span>
-          </div>
-        `).join('');
-      }
+          `;
+        }).join('');
+      };
+
+      // ヘルパー：精算指示テキスト構築
+      const renderSettlementText = (transfers, symbol) => {
+        if (!transfers || transfers.length === 0) return '精算の必要はありません';
+        return transfers.map(t => `${t.from} ➔ ${t.to} : ${fmt(t.amount, symbol)}`).join(' / ');
+      };
 
       return `
-        <div class="space-y-4">
-          <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow">
-            <p class="text-xs text-blue-100">旅程全体の総費用（円換算）</p>
-            <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round(convertedResult ? convertedResult.grandTotal : jpyResult.grandTotal).toLocaleString()}</p>
-            ${foreignCode ? `<p class="text-[11px] text-amber-200 mt-1">※1 ${foreignCode} = ${trip.currencyRate}円 で計算</p>` : ''}
-          </div>
-
-          <!-- パターン1: 円(JPY)のみの精算 -->
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <div class="flex justify-between items-center mb-2 border-b pb-1.5">
-              <h3 class="text-xs font-bold text-gray-800 flex items-center gap-1">
-                <span>💴</span> 日本円 (JPY) で支払った分の精算
-              </h3>
-              <span class="text-xs font-extrabold text-green-700">小計: ¥${Math.round(jpyResult.grandTotal).toLocaleString()}</span>
+        <div class="space-y-5">
+          {/* 1. 日本円 (JPY) ブロック */}
+          <section class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="bg-blue-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+              <h2 class="font-bold text-blue-900 text-sm">円 (JPY)</h2>
+              <span class="text-xs font-bold text-blue-700">小計: ¥ ${Math.round(jpyData.grandTotal).toLocaleString()}</span>
             </div>
-            ${renderTransferCards(jpyResult.transfers, '¥')}
-          </div>
+            <div class="p-4 space-y-4">
+              ${renderMemberBlocks('jpy', jpyData, '¥', 'blue')}
+
+              <div class="mt-4 pt-3 border-t border-dashed border-gray-300 bg-amber-50 -mx-4 -mb-4 p-3 rounded-b-xl">
+                <span class="text-xs font-bold text-amber-800 block mb-1">【精算】</span>
+                <p class="text-sm font-bold text-amber-900">${renderSettlementText(jpyData.transfers, '¥')}</p>
+              </div>
+            </div>
+          </section>
 
           ${foreignCode ? `
-            <!-- パターン2: 設定した海外通貨のみの精算 -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <div class="flex justify-between items-center mb-2 border-b pb-1.5">
-                <h3 class="text-xs font-bold text-gray-800 flex items-center gap-1">
-                  <span>🔀</span> ${foreignCode} で支払った分の精算
-                </h3>
-                <span class="text-xs font-extrabold text-amber-700">小計: ${foreignCode} ${Math.round(foreignResult.grandTotal).toLocaleString()}</span>
+            {/* 2. 選択通貨 (海外通貨) ブロック */}
+            <section class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div class="bg-emerald-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="font-bold text-emerald-900 text-sm">${foreignCode}</h2>
+                <span class="text-xs font-bold text-emerald-700">小計: ${foreignCode} ${foreignData.grandTotal.toLocaleString()}</span>
               </div>
-              ${renderTransferCards(foreignResult.transfers, `${foreignCode} `)}
-            </div>
+              <div class="p-4 space-y-4">
+                ${renderMemberBlocks('foreign', foreignData, foreignCode, 'emerald')}
 
-            <!-- パターン3: 円換算後の総合精算 -->
-            <div class="bg-blue-50/60 p-4 rounded-xl shadow-sm border border-blue-200">
-              <div class="flex justify-between items-center mb-2 border-b border-blue-200 pb-1.5">
-                <h3 class="text-xs font-bold text-blue-900 flex items-center gap-1">
-                  <span>🌐</span> ${foreignCode}を円換算して一括で清算する場合
-                </h3>
-                <span class="text-xs font-extrabold text-blue-700">合計: 約 ¥${Math.round(convertedResult.grandTotal).toLocaleString()}</span>
+                <div class="mt-4 pt-3 border-t border-dashed border-gray-300 bg-amber-50 -mx-4 -mb-4 p-3 rounded-b-xl">
+                  <span class="text-xs font-bold text-amber-800 block mb-1">【精算】</span>
+                  <p class="text-sm font-bold text-amber-900">${renderSettlementText(foreignData.transfers, foreignCode)}</p>
+                </div>
               </div>
-              ${renderTransferCards(convertedResult.transfers, '¥')}
-            </div>
+            </section>
+
+            {/* 3. 総合計 (レート換算) ブロック */}
+            <section class="bg-gray-900 text-white rounded-xl shadow-md overflow-hidden">
+              <div class="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="font-bold text-amber-400 text-sm">総合計 (一括精算)</h2>
+                <span class="text-xs text-gray-400">レート: 1 ${foreignCode} = ${rate}円</span>
+              </div>
+              <div class="p-4 space-y-3">
+                ${members.map(m => `
+                  <div class="flex justify-between items-center text-sm">
+                    <span>${m} 合計支払額</span>
+                    <span class="font-bold">¥ ${Math.round(convertedData.memberTotals[m] || 0).toLocaleString()}</span>
+                  </div>
+                `).join('')}
+
+                <div class="mt-4 pt-3 border-t border-gray-700 bg-gray-800 -mx-4 -mb-4 p-4 rounded-b-xl">
+                  <span class="text-xs font-bold text-amber-400 block mb-1">【最終精算】</span>
+                  <p class="text-base font-bold text-white">${renderSettlementText(convertedData.transfers, '¥')}</p>
+                </div>
+              </div>
+            </section>
           ` : ''}
-        </div>`;
+        </div>
+      `;
     }
 
     // --- AI相談 ---
