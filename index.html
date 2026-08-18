@@ -3,243 +3,217 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tabiori 風 旅行しおりアプリ</title>
+  <title>Tabiori - リアルタイム共有しおり</title>
+
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Firebase SDK (ES Module) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // --- Firebase 初期設定 ---
+    // ※テスト用のFirebaseプロジェクト構成です。
+    // ご自身のFirebaseプロジェクトを使用する場合は、以下のfirebaseConfigとdatabaseURLを書き換えてください。
+    const firebaseConfig = {
+      databaseURL: "https://tabiori-realtime-default-rtdb.firebaseio.com" 
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // グローバルスコープへ公開して既存スクリプトから呼び出し可能にする
+    window.firebaseDB = db;
+    window.dbRef = ref;
+    window.dbOnValue = onValue;
+    window.dbSet = set;
+    
+    // SDK読み込み完了イベントを発行
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans pb-24">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased pb-20 sm:pb-0">
 
   <!-- ヘッダー -->
-  <header class="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
-    <div class="max-w-md mx-auto flex justify-between items-center">
-      <div>
-        <h1 id="header-title" class="text-lg font-bold">旅行しおり</h1>
-        <p id="header-sub" class="text-xs text-blue-100">旅行を選択してください</p>
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-sm">
+          <i data-lucide="map-pin" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 id="tripTitleDisplay" class="font-bold text-slate-900 leading-tight text-lg">Tabiori</h1>
+          <span id="syncStatus" class="text-xs text-emerald-600 font-medium flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> リアルタイム同期中
+          </span>
+        </div>
       </div>
-      <div class="flex gap-1.5">
-        <button onclick="shareActiveTrip()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold" title="共有URLをコピー">
+
+      <div class="flex items-center gap-2">
+        <button onclick="copyShareLink()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-sm font-semibold transition">
           <i data-lucide="share-2" class="w-4 h-4"></i>
           <span>共有</span>
         </button>
-        <button onclick="showEditTripModal()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs p-2 rounded-lg flex items-center justify-center font-bold" title="旅行設定の変更">
-          <i data-lucide="settings" class="w-4 h-4"></i>
-        </button>
-        <button onclick="switchTab('trips')" class="bg-blue-700 hover:bg-blue-800 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold">
-          <i data-lucide="folder" class="w-4 h-4"></i>
-          <span>一覧</span>
+        <button onclick="createNewTrip()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">新規作成</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- メインコンテンツ表示エリア -->
-  <main id="app-content" class="p-4 max-w-md mx-auto"></main>
+  <!-- メインコンテンツ -->
+  <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
 
-  <!-- モーダル表示領域 -->
-  <div id="modal-container"></div>
+    <!-- タブ切り替え -->
+    <div class="flex border-b border-slate-200 bg-white rounded-xl p-1 shadow-sm">
+      <button id="tabBtnItinerary" onclick="switchTab('itinerary')" class="flex-1 py-2 text-center font-bold text-sm rounded-lg transition bg-indigo-600 text-white">
+        <i data-lucide="calendar" class="w-4 h-4 inline mr-1"></i> 旅程
+      </button>
+      <button id="tabBtnSplit" onclick="switchTab('split')" class="flex-1 py-2 text-center font-bold text-sm rounded-lg transition text-slate-500 hover:text-slate-900">
+        <i data-lucide="calculator" class="w-4 h-4 inline mr-1"></i> ワリカン
+      </button>
+    </div>
 
-  <!-- 下部タブバー -->
-  <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto z-20">
-    <button onclick="switchTab('home')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-home">
-      <i data-lucide="home" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">ホーム</span>
-    </button>
-    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-itinerary">
-      <i data-lucide="calendar" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">旅程</span>
-    </button>
-    <button onclick="switchTab('belongings')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-belongings">
-      <i data-lucide="check-square" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">持ち物</span>
-    </button>
-    <button onclick="switchTab('settlement')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-settlement">
-      <i data-lucide="japanese-yen" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">精算</span>
-    </button>
-    <button onclick="switchTab('ai')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-ai">
-      <i data-lucide="sparkles" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">AI解析</span>
-    </button>
-  </nav>
+    <!-- 旅程タブ -->
+    <section id="tabContentItinerary" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span>スケジュール</span>
+        </h2>
+        <button onclick="openEventModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-1">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> 予定を追加
+        </button>
+      </div>
 
+      <!-- 予定一覧 -->
+      <div id="eventList" class="space-y-3">
+        <!-- JSで動的に追加されます -->
+      </div>
+    </section>
+
+    <!-- ワリカンタブ -->
+    <section id="tabContentSplit" class="space-y-4 hidden">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800">立替・精算</h2>
+        <button onclick="openExpenseModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm transition flex items-center gap-1">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> 支出を記録
+        </button>
+      </div>
+
+      <!-- 支出一覧 -->
+      <div id="expenseList" class="space-y-3">
+        <!-- JSで動的に追加されます -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- モーダル: 予定の追加・編集 -->
+  <div id="eventModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-900">予定の追加/編集</h3>
+        <button onclick="closeModal('eventModal')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="eventForm" onsubmit="handleSaveEvent(event)" class="space-y-3">
+        <input type="hidden" id="eventId">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">タイトル</label>
+          <input type="text" id="eventTitle" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">時間</label>
+            <input type="time" id="eventTime" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">種類</label>
+            <select id="eventType" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none">
+              <option value="spot">📍 観光スポット</option>
+              <option value="move">🚗 移動</option>
+              <option value="hotel">🏨 宿泊</option>
+              <option value="food">🍽️ グルメ</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">メモ・予約情報</label>
+          <textarea id="eventMemo" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm outline-none"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('eventModal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- モーダル: 支出の追加 -->
+  <div id="expenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-900">支出の記録</h3>
+        <button onclick="closeModal('expenseModal')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="expenseForm" onsubmit="handleSaveExpense(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">内容</label>
+          <input type="text" id="expenseTitle" placeholder="例: 夕食代" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">金額 (円)</label>
+            <input type="number" id="expenseAmount" placeholder="3000" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">支払った人</label>
+            <input type="text" id="expensePayer" placeholder="例: たろう" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('expenseModal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">キャンセル</button>
+          <button type="submit" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript アプリケーションロジック -->
   <script>
-    const destinationPresets = [
-      {
-        keywords: ["温泉", "別府", "草津", "箱根", "湯布院", "大分"],
-        items: ["フェイスタオル / 手ぬぐい", "ビニール袋", "スキンケア用品", "脱ぎ履きしやすい靴"]
-      },
-      {
-        keywords: ["海", "ビーチ", "沖縄", "プール", "ハワイ", "グアム"],
-        items: ["水着 / ラッシュガード", "サンダル", "日焼け止め", "防水スマホケース", "サングラス"]
-      },
-      {
-        keywords: ["山", "ハイキング", "登山", "キャンプ"],
-        items: ["レインウェア / 雨具", "虫よけスプレー", "モバイルバッテリー", "常備薬 / 絆創膏"]
-      }
-    ];
+    // --- アプリケーション状態 ---
+    let currentTripId = "";
+    let isEditing = false; // モーダル開閉中フラグ（編集中はリモート同期で入力欄を破棄しないため）
+    let currentTrip = {
+      title: "みんなの旅行しおり",
+      events: [],
+      expenses: []
+    };
 
-    const defaultTrips = [
-      {
-        id: "trip_default_1",
-        title: "別府温泉旅行",
-        destination: "大分・別府",
-        startDate: "2026-09-19",
-        endDate: "2026-09-21",
-        nightsText: "2泊3日",
-        daysCount: 3,
-        members: ["たろう", "はなこ"],
-        currencies: [],
-        activeDay: 1,
-        schedule: [
-          { day: 1, date: "1日目", events: [] },
-          { day: 2, date: "2日目", events: [] },
-          { day: 3, date: "3日目", events: [] }
-        ],
-        belongings: [
-          { id: 1, item: "着替え", checked: false },
-          { id: 2, item: "充電器", checked: false }
-        ],
-        chatHistory: [
-          { sender: 'ai', text: '旅程テキストを貼り付けて送信してください！自動で解析してカードを作成します。' }
-        ]
+    // --- 初期化ロジック ---
+    window.addEventListener('firebase-ready', () => {
+      // 1. URLハッシュからTripIDを取得、なければ新規発行
+      currentTripId = window.location.hash.replace('#', '');
+      if (!currentTripId) {
+        currentTripId = 'trip_' + Math.random().toString(36).substr(2, 9);
+        window.location.hash = currentTripId;
       }
-    ];
 
-    let trips = JSON.parse(localStorage.getItem('my_trips')) || defaultTrips;
-    let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
-    let openAccordions = {};
-
-    // 移行用：古いデータ形式（currencyCode/currencyRate）があればcurrencies配列に変換
-    trips.forEach(t => {
-      if (!t.currencies) {
-        t.currencies = [];
-        if (t.currencyCode && t.currencyRate) {
-          t.currencies.push({ code: t.currencyCode, rate: t.currencyRate });
-        }
-        delete t.currencyCode;
-        delete t.currencyRate;
-      }
+      // 2. Firebase リアルタイム同期リスナー開始
+      setupRealtimeSync(currentTripId);
+      lucide.createIcons();
     });
 
-    function checkSharedURL() {
-      if (window.location.hash.startsWith('#trip=')) {
-        try {
-          const encodedData = window.location.hash.replace('#trip=', '');
-          const jsonStr = decodeURIComponent(atob(encodedData));
-          const importedTrip = JSON.parse(jsonStr);
-
-          if (importedTrip && importedTrip.id && importedTrip.title) {
-            const existingIdx = trips.findIndex(t => t.id === importedTrip.id);
-            if (existingIdx !== -1) {
-              trips[existingIdx] = importedTrip;
-            } else {
-              trips.unshift(importedTrip);
-            }
-            activeTripId = importedTrip.id;
-            saveTrips();
-            alert(`「${importedTrip.title}」の旅行データを共有URLから読み込みました！`);
-            history.replaceState(null, '', window.location.pathname);
-          }
-        } catch (e) {
-          console.error("共有データのパースに失敗しました", e);
-        }
-      }
-    }
-
-    function shareActiveTrip() {
-      const trip = getCurrentTrip();
-      if (!trip) return;
-
-      try {
-        const jsonStr = JSON.stringify(trip);
-        const encodedData = btoa(encodeURIComponent(jsonStr));
-        const shareURL = `${window.location.origin}${window.location.pathname}#trip=${encodedData}`;
-
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareURL).then(() => {
-            alert(`「${trip.title}」の編集用共有URLをクリップボードにコピーしました！`);
-          });
-        } else {
-          prompt("以下のURLをコピーして友達に共有してください：", shareURL);
-        }
-      } catch (e) {
-        alert("データの容量が大きすぎるため共有URLを作成できませんでした。");
-      }
-    }
-
-    function saveTrips() {
-      localStorage.setItem('my_trips', JSON.stringify(trips));
-      localStorage.setItem('active_trip_id', activeTripId);
-    }
-
-    function getCurrentTrip() {
-      return trips.find(t => t.id === activeTripId) || trips[0];
-    }
-
-    function updateHeader() {
-      const trip = getCurrentTrip();
-      if (trip) {
-        document.getElementById('header-title').innerText = trip.title;
-        const dur = trip.nightsText || `${trip.daysCount}日間`;
-        const mCount = trip.members ? trip.members.length : 1;
-        document.getElementById('header-sub').innerText = `${trip.destination} / ${dur} (${mCount}名)`;
-      } else {
-        document.getElementById('header-title').innerText = "旅行しおり";
-        document.getElementById('header-sub').innerText = "旅行を選択してください";
-      }
-    }
-
-    function renderTrips() {
-      const tripListHTML = trips.map(t => {
-        const isActive = t.id === activeTripId;
-        const dur = t.nightsText || `${t.daysCount}日間`;
-        return `
-          <div class="bg-white p-4 rounded-xl border ${isActive ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'} shadow-sm mb-3 flex justify-between items-center">
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 class="font-bold text-gray-800">${t.title}</h3>
-                ${isActive ? '<span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">選択中</span>' : ''}
-              </div>
-              <p class="text-xs text-gray-500 mt-1">📍 ${t.destination} ｜ 🗓 ${dur}</p>
-            </div>
-            <div class="flex gap-1.5">
-              <button onclick="selectTrip('${t.id}')" class="text-xs ${isActive ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'} font-bold px-3 py-1.5 rounded-lg">
-                ${isActive ? '表示中' : '開く'}
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <div class="space-y-4">
-          <button onclick="showCreateTripModal()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold p-3.5 rounded-xl shadow flex items-center justify-center gap-2">
-            <i data-lucide="plus-circle" class="w-5 h-5"></i>
-            <span>新しい旅行を作成する</span>
-          </button>
-          <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">作成済みの旅行一覧</h2>
-          <div>${tripListHTML}</div>
-        </div>
-      `;
-    }
-
-    function showCreateTripModal(isEdit = false) {
-      const trip = isEdit ? getCurrentTrip() : null;
-      const titleVal = trip ? trip.title : '';
-      const destVal = trip ? trip.destination : '';
-      const startVal = trip ? trip.startDate : '';
-      const endVal = trip ? trip.endDate : '';
-      const members = trip && trip.members ? trip.members : ['自分', 'メンバー2'];
-      const currencies = trip && trip.currencies ? trip.currencies : [];
-
-      const html = `
-        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div class="bg-white p-5 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md my-8 space-y-3">
-            <h2 class="text-base font-bold text-gray-800 border-b pb-2">${isEdit ? '⚙️ 旅行設定の変更' : '✈️ 新しい旅行を作成'}</h2>
-            
-            <div>
-              <label class="block text-xs font-bold text-gray-600 mb-1">旅行タイトル</label>
-              <input id="new-title" type="text" value="${titleVal}" placeholder="例：ヨーロッパ周遊旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
-            </div>
-
-     
+    // --- Firebase リアルタイム同期 ---
+    function setupRealtimeSync(tripId) {
+      const tripRef = window.dbRef(window.firebaseDB, 'trips/' + tripId);
+      
+      window.dbOnValue(tripRef, (snapshot) => 
