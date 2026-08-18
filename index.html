@@ -363,6 +363,7 @@
       document.getElementById('modal-container').innerHTML = '';
     }
 
+    // --- ホーム画面レンダー (要予約タスク一括抽出) ---
     function renderHome() {
       const trip = getCurrentTrip();
       if (!trip) return renderTrips();
@@ -370,20 +371,109 @@
       const memberCount = trip.members ? trip.members.length : 1;
       const dur = trip.nightsText || `${trip.daysCount}日間`;
 
+      // 要予約イベントの一括収集
+      const unreservedEvents = [];
+      let totalEventCount = 0;
+      let totalExpense = 0;
+
+      trip.schedule.forEach(s => {
+        s.events.forEach(evt => {
+          totalEventCount++;
+          if (evt.expense) totalExpense += Number(evt.expense);
+
+          if (evt.bookingStatus === 'unreserved') {
+            unreservedEvents.push({ ...evt, day: s.day });
+          }
+        });
+      });
+
+      // 要予約リストのHTML構築
+      let reservationHTML = '';
+      if (unreservedEvents.length > 0) {
+        reservationHTML = `
+          <div class="bg-red-50/90 border border-red-200 rounded-2xl p-4 shadow-sm">
+            <div class="flex justify-between items-center mb-2.5">
+              <h3 class="text-xs font-bold text-red-700 flex items-center gap-1.5">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-red-500"></i> 要予約の予定 (${unreservedEvents.length}件)
+              </h3>
+              <span class="text-[10px] text-red-500 font-semibold">事前確認が必要です</span>
+            </div>
+            <div class="space-y-2">
+              ${unreservedEvents.map(evt => {
+                const titleText = evt.title || `${evt.fromLoc || ''} ➔ ${evt.toLoc || ''}`;
+                const typeIcon = evt.type === 'hotel' ? '🏨' : (evt.type === 'move' ? '🚌' : '📍');
+                const timeText = evt.time ? `🕒 ${evt.time}` : '';
+                return `
+                  <div onclick="openEventModalFromHome('${evt.id}', ${evt.day})" class="bg-white p-3 rounded-xl border border-red-100 shadow-sm flex justify-between items-center cursor-pointer hover:border-red-300 transition">
+                    <div>
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-gray-800">${typeIcon} ${titleText}</span>
+                      </div>
+                      <p class="text-[11px] text-gray-500 mt-0.5">Day ${evt.day} ${timeText ? '｜ ' + timeText : ''}</p>
+                    </div>
+                    <span class="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-1 rounded-md">設定・確認 ➔</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        reservationHTML = `
+          <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 text-center">
+            <p class="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i> 要予約のタスクはありません！
+            </p>
+            <p class="text-[11px] text-emerald-600 mt-0.5">すべての予約確認が完了しているか、設定されていません。</p>
+          </div>
+        `;
+      }
+
       return `
         <div class="space-y-4">
+          <!-- メインヘッダーカード -->
           <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg">
             <span class="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-semibold">📍 ${trip.destination}</span>
             <h2 class="text-xl font-bold mt-2">${trip.title}</h2>
             <p class="text-xs text-blue-100 mt-1">🗓 ${dur} / 👥 ${memberCount}名 (${trip.members ? trip.members.join(', ') : ''})</p>
             <div class="mt-4 flex gap-2">
-              <button onclick="switchTab('itinerary')" class="bg-white text-blue-700 text-xs px-4 py-2 rounded-xl font-bold shadow-sm">旅程を見よう</button>
-              <button onclick="shareActiveTrip()" class="bg-blue-500/40 border border-white/30 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1">
+              <button onclick="switchTab('itinerary')" class="bg-white text-blue-700 text-xs px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition">旅程を見よう</button>
+              <button onclick="shareActiveTrip()" class="bg-blue-500/40 border border-white/30 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1 hover:bg-blue-500/60 transition">
                 <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 共有URL作成
               </button>
             </div>
           </div>
+
+          <!-- 旅程サマリーミニカード -->
+          <div class="grid grid-cols-2 gap-3">
+            <div onclick="switchTab('itinerary')" class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 transition">
+              <div class="flex items-center gap-1.5 text-blue-600 font-bold text-xs">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                <span>登録スポット数</span>
+              </div>
+              <p class="text-lg font-extrabold text-gray-800 mt-1">${totalEventCount} <span class="text-xs font-normal text-gray-500">件</span></p>
+            </div>
+            <div onclick="switchTab('settlement')" class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 transition">
+              <div class="flex items-center gap-1.5 text-green-600 font-bold text-xs">
+                <i data-lucide="japanese-yen" class="w-4 h-4"></i>
+                <span>概算合計金額</span>
+              </div>
+              <p class="text-lg font-extrabold text-gray-800 mt-1">¥${totalExpense.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <!-- ⚠️ 要予約タスクリスト -->
+          ${reservationHTML}
         </div>`;
+    }
+
+    function openEventModalFromHome(eventId, day) {
+      const trip = getCurrentTrip();
+      if (trip) {
+        trip.activeDay = day;
+        saveTrips();
+        openEventModal(eventId);
+      }
     }
 
     function getBookingBadge(status) {
@@ -836,7 +926,7 @@
 
       const paidMap = {};
       const shareMap = {};
-      const paidItemsMap = {}; // 誰が何を払ったかの明細リスト
+      const paidItemsMap = {};
 
       members.forEach(m => { 
         paidMap[m] = 0; 
@@ -902,7 +992,6 @@
         if (cred.balance <= 1) cIdx++;
       }
 
-      // タップで開閉できるメンバー別収支リスト
       const balanceListHTML = balances.map((b, idx) => {
         const itemsHTML = b.items.length > 0 ? b.items.map(item => `
           <div class="flex justify-between items-center py-1.5 px-2 bg-gray-50 rounded text-[11px] text-gray-600">
