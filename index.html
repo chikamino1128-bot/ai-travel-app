@@ -11,7 +11,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-gray-800 flex justify-center">
 
-  <!-- アプリのメインコンテナ（スマホ風の幅制限） -->
+  <!-- アプリのメインコンテナ -->
   <div class="w-full max-w-md bg-slate-50 min-h-screen flex flex-col shadow-xl relative pb-20">
 
     <!-- ヘッダー -->
@@ -241,7 +241,7 @@
       });
     }
 
-    // --- 4. 日程表画面 ---
+    // --- 4. 日程表画面（元のレイアウト・項目を維持） ---
     function renderItinerary() {
       const trip = getCurrentTrip();
       if (!trip) return '';
@@ -441,7 +441,7 @@
             <h2 class="text-sm font-bold">チャット解析（日程追加）</h2>
           </div>
           <p class="text-xs text-gray-500 leading-relaxed">
-            LINEなどの会話テキストを貼り付けると、AI風に時間と予定を自動抽出してスケジュールに追加します。
+            LINEなどの会話テキストを貼り付けると、時間と予定を自動抽出して日程表に追加します。
           </p>
 
           <textarea id="chat-input" class="w-full border border-gray-200 rounded-lg p-2.5 text-xs h-32 focus:outline-none focus:border-indigo-500" placeholder="【貼り付け例】
@@ -460,7 +460,6 @@
       const text = document.getElementById('chat-input').value;
       if (!text.trim()) return alert("テキストを入力してください");
 
-      // 簡易的な正規表現パターン（例: "10:00", "10時", "10時半" など）
       const lines = text.split('\n');
       const trip = getCurrentTrip();
       let addedCount = 0;
