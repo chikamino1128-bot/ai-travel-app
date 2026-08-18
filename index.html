@@ -1,62 +1,77 @@
-function mergeItineraryText(text) {
-  const trip = getCurrentTrip();
-  if (!trip) return;
-
-  const lines = text.split('\n');
+/**
+ * チャット等から入力されたテキストをもとに、既存の旅程データを安全にマージ（更新・追加）する関数
+ *
+ * @param {Object} currentTrip - 既存の旅程データ（schedule, members を含むオブジェクト）
+ * @param {string} inputText - チャットから送られてきたテキスト
+ * @returns {Object} - 費用や写真などの既存プロパティを保持したまま更新された新しい旅程データ
+ */
+function mergeItineraryText(currentTrip, inputText) {
+  // 元のオブジェクトを壊さないようディープコピー
+  const updatedTrip = JSON.parse(JSON.stringify(currentTrip));
+  
+  const lines = inputText.split('\n');
   let currentDayNum = 1;
 
   lines.forEach(line => {
     const trimmed = line.trim();
     if (!trimmed) return;
 
-    // 「1日目」「2日目」などの日付け指定を判定
+    // 「1日目」「2日目」などの日付切り替え判定
     const dayMatch = trimmed.match(/(?:🗓️)?\s*(\d+)日目/);
     if (dayMatch) {
-      currentDayNum = parseInt(dayMatch[1]);
+      currentDayNum = parseInt(dayMatch[1], 10);
       return;
     }
 
-    const currentSchedule = trip.schedule.find(s => s.day === currentDayNum);
-    if (!currentSchedule) return;
+    // 対象の日のスケジュールを取得（無ければ作成）
+    let currentSchedule = updatedTrip.schedule.find(s => s.day === currentDayNum);
+    if (!currentSchedule) {
+      currentSchedule = { day: currentDayNum, events: [] };
+      updatedTrip.schedule.push(currentSchedule);
+    }
 
-    // 時間とタイトルの抽出（例: 13:15〜14:15 ランチ）
+    // 時間とタイトルの抽出（例: "13:15〜14:15 ランチ" や "17:00 チェックイン"）
     const timeMatch = trimmed.match(/^(\d{1,2}:\d{2})(?:[〜~-](\d{1,2}:\d{2}))?\s*(.+)$/);
+    
     if (timeMatch) {
       const startTime = timeMatch[1];
       const endTime = timeMatch[2] || '';
       const newTitle = timeMatch[3].trim();
 
-      // 同じ時間の既存イベントを検索
+      // 同じ開始時間の既存イベントを検索
       const existingEvent = currentSchedule.events.find(e => e.time === startTime);
 
       if (existingEvent) {
-        // 【重要】既存データを壊さず、変更のあった項目（タイトル・終了時間）のみ上書き
+        // 【重要】既存の全フィールド（expense, paidBy, memo, photos, bookingStatus等）はそのまま維持し、
+        // テキストから送られてきたタイトルと終了時間だけをピンポイント更新
         existingEvent.title = newTitle;
         if (endTime) {
           existingEvent.endTime = endTime;
         }
-        // ※ expense, paidBy, memo, photos, bookingStatus などはノータッチで保持されます
       } else {
-        // 新規作成時も、写真(photos)や費用(expense)などの全フィールドを初期値付きで用意
+        // 新しい予定の場合も、すべての入力・選択フィールド欄（初期値）を漏れなく保持して追加
+        const defaultMember = (updatedTrip.members && updatedTrip.members.length > 0) 
+          ? updatedTrip.members[0] 
+          : '自分';
+        
         currentSchedule.events.push({
-          id: 'evt_' + Date.now() + Math.random().toString(36).substr(2, 4),
+          id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
           type: newTitle.includes('✈️') || newTitle.includes('🚗') ? 'move' : 'spot',
           title: newTitle,
           time: startTime,
           endTime: endTime,
           startDay: currentDayNum,
           endDay: currentDayNum,
-          bookingStatus: 'unnecessary',
-          expense: '',
-          paidBy: trip.members[0] || '自分',
-          forMembers: [...trip.members],
-          memo: '',
-          photos: [] // 写真用配列も保持
+          bookingStatus: 'unnecessary', // 予約状況（選択欄）
+          expense: '',                  // 費用（記入欄）
+          paidBy: defaultMember,        // 支払者（選択欄）
+          forMembers: updatedTrip.members ? [...updatedTrip.members] : [],
+          memo: '',                     // メモ（記入欄）
+          photos: []                    // 写真（登録欄）
         });
       }
     }
   });
 
-  saveTrips();
-  switchTab('itinerary');
+  return updatedTrip;
 }
