@@ -63,6 +63,21 @@
   </nav>
 
   <script>
+    const destinationPresets = [
+      {
+        keywords: ["温泉", "別府", "草津", "箱根", "湯布院", "大分"],
+        items: ["フェイスタオル / 手ぬぐい", "ビニール袋", "スキンケア用品", "脱ぎ履きしやすい靴"]
+      },
+      {
+        keywords: ["海", "ビーチ", "沖縄", "プール", "ハワイ", "グアム"],
+        items: ["水着 / ラッシュガード", "サンダル", "日焼け止め", "防水スマホケース", "サングラス"]
+      },
+      {
+        keywords: ["山", "ハイキング", "登山", "キャンプ"],
+        items: ["レインウェア / 雨具", "虫よけスプレー", "モバイルバッテリー", "常備薬 / 絆創膏"]
+      }
+    ];
+
     const defaultTrips = [
       {
         id: "trip_default_1",
@@ -73,7 +88,8 @@
         nightsText: "2泊3日",
         daysCount: 3,
         members: ["自分", "メンバー2"],
-        currencies: [{ code: "JPY", rate: 1.0 }],
+        currencyCode: "USD",
+        currencyRate: 150.0,
         activeDay: 1,
         schedule: [
           { day: 1, date: "1日目", events: [] },
@@ -202,6 +218,8 @@
       const startVal = trip ? trip.startDate : '';
       const endVal = trip ? trip.endDate : '';
       const members = trip && trip.members ? trip.members : ['自分', 'メンバー2'];
+      const currencyCode = trip && trip.currencyCode ? trip.currencyCode : '';
+      const currencyRate = trip && trip.currencyRate ? trip.currencyRate : '';
 
       const html = `
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -210,12 +228,12 @@
             
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">旅行タイトル</label>
-              <input id="new-title" type="text" value="${titleVal}" placeholder="例：別府温泉旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              <input id="new-title" type="text" value="${titleVal}" placeholder="例：ハワイ旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
 
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">行き先</label>
-              <input id="new-destination" type="text" value="${destVal}" placeholder="例：大分・別府" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              <input id="new-destination" type="text" value="${destVal}" placeholder="例：ホノルル" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
@@ -231,6 +249,22 @@
 
             <div id="nights-display" class="text-xs font-bold text-blue-600 bg-blue-50 p-2 rounded-lg text-center hidden">
               期間: <span id="nights-text"></span>
+            </div>
+
+            <!-- 海外通貨設定エリア -->
+            <div class="bg-amber-50/70 border border-amber-200 p-3 rounded-xl space-y-2">
+              <span class="text-xs font-bold text-amber-900 block">🔀 海外通貨の設定（任意）</span>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-bold text-amber-800 mb-1">通貨単位/コード</label>
+                  <input id="new-currency-code" type="text" value="${currencyCode}" placeholder="例：USD, EUR, WON" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500 uppercase">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-amber-800 mb-1">1通貨あたりの円(レート)</label>
+                  <input id="new-currency-rate" type="number" step="0.01" value="${currencyRate}" placeholder="例：150" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+              <p class="text-[10px] text-amber-700">※設定すると旅程入力時に日本円以外の精算も選べるようになります。</p>
             </div>
 
             <div>
@@ -299,6 +333,8 @@
       const destination = document.getElementById('new-destination').value.trim() || '未定';
       const startDate = document.getElementById('new-start-date').value || '';
       const endDate = document.getElementById('new-end-date').value || '';
+      const currencyCode = document.getElementById('new-currency-code').value.trim().toUpperCase();
+      const currencyRate = parseFloat(document.getElementById('new-currency-rate').value) || 0;
 
       const { days, text } = calculateNights();
       const daysCount = days > 0 ? days : 1;
@@ -315,6 +351,8 @@
         trip.nightsText = text;
         trip.daysCount = daysCount;
         trip.members = members;
+        trip.currencyCode = currencyCode;
+        trip.currencyRate = currencyRate;
 
         while (trip.schedule.length < daysCount) {
           const nextDay = trip.schedule.length + 1;
@@ -334,7 +372,8 @@
           endDate,
           nightsText: text,
           daysCount,
-          currencies: [{ code: 'JPY', rate: 1.0 }],
+          currencyCode,
+          currencyRate,
           members,
           activeDay: 1,
           schedule,
@@ -363,7 +402,7 @@
       document.getElementById('modal-container').innerHTML = '';
     }
 
-    // --- ホーム画面レンダー (要予約タスク一括抽出) ---
+    // --- ホーム画面 ---
     function renderHome() {
       const trip = getCurrentTrip();
       if (!trip) return renderTrips();
@@ -371,15 +410,22 @@
       const memberCount = trip.members ? trip.members.length : 1;
       const dur = trip.nightsText || `${trip.daysCount}日間`;
 
-      // 要予約イベントの一括収集
       const unreservedEvents = [];
       let totalEventCount = 0;
-      let totalExpense = 0;
+      let totalExpenseYen = 0;
 
       trip.schedule.forEach(s => {
         s.events.forEach(evt => {
           totalEventCount++;
-          if (evt.expense) totalExpense += Number(evt.expense);
+          if (evt.expense) {
+            const exp = Number(evt.expense);
+            const curr = evt.currency || 'JPY';
+            if (curr === 'JPY') {
+              totalExpenseYen += exp;
+            } else if (trip.currencyRate > 0) {
+              totalExpenseYen += exp * trip.currencyRate;
+            }
+          }
 
           if (evt.bookingStatus === 'unreserved') {
             unreservedEvents.push({ ...evt, day: s.day });
@@ -387,7 +433,6 @@
         });
       });
 
-      // 要予約リストのHTML構築
       let reservationHTML = '';
       if (unreservedEvents.length > 0) {
         reservationHTML = `
@@ -431,11 +476,11 @@
 
       return `
         <div class="space-y-4">
-          <!-- メインヘッダーカード -->
           <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg">
             <span class="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-semibold">📍 ${trip.destination}</span>
             <h2 class="text-xl font-bold mt-2">${trip.title}</h2>
             <p class="text-xs text-blue-100 mt-1">🗓 ${dur} / 👥 ${memberCount}名 (${trip.members ? trip.members.join(', ') : ''})</p>
+            ${trip.currencyCode ? `<p class="text-[11px] text-amber-200 font-semibold mt-1">🔀 海外通貨: ${trip.currencyCode} (1 ${trip.currencyCode} = ${trip.currencyRate}円)</p>` : ''}
             <div class="mt-4 flex gap-2">
               <button onclick="switchTab('itinerary')" class="bg-white text-blue-700 text-xs px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-50 transition">旅程を見よう</button>
               <button onclick="shareActiveTrip()" class="bg-blue-500/40 border border-white/30 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1 hover:bg-blue-500/60 transition">
@@ -444,7 +489,6 @@
             </div>
           </div>
 
-          <!-- 旅程サマリーミニカード -->
           <div class="grid grid-cols-2 gap-3">
             <div onclick="switchTab('itinerary')" class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 transition">
               <div class="flex items-center gap-1.5 text-blue-600 font-bold text-xs">
@@ -456,13 +500,12 @@
             <div onclick="switchTab('settlement')" class="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-blue-300 transition">
               <div class="flex items-center gap-1.5 text-green-600 font-bold text-xs">
                 <i data-lucide="japanese-yen" class="w-4 h-4"></i>
-                <span>概算合計金額</span>
+                <span>概算合計(円換算)</span>
               </div>
-              <p class="text-lg font-extrabold text-gray-800 mt-1">¥${totalExpense.toLocaleString()}</p>
+              <p class="text-lg font-extrabold text-gray-800 mt-1">¥${Math.round(totalExpenseYen).toLocaleString()}</p>
             </div>
           </div>
 
-          <!-- ⚠️ 要予約タスクリスト -->
           ${reservationHTML}
         </div>`;
     }
@@ -541,8 +584,14 @@
           if (evt.expense) {
             const paidStr = evt.paidBy ? `（支払: ${evt.paidBy}）` : '';
             const targetStr = evt.forMembers && evt.forMembers.length > 0 ? ` 👥対象: ${evt.forMembers.join(', ')}` : '';
+            const currSymbol = evt.currency === 'JPY' || !evt.currency ? '¥' : `${evt.currency} `;
+            const convertedStr = (evt.currency && evt.currency !== 'JPY' && trip.currencyRate > 0) 
+              ? ` <span class="text-[10px] text-gray-500 font-normal">(約 ¥${Math.round(evt.expense * trip.currencyRate).toLocaleString()})</span>` 
+              : '';
+
             expenseBadge = `<div class="text-[11px] font-bold text-green-700 bg-green-50 p-1.5 rounded border border-green-200 flex flex-wrap items-center gap-1">
-              <span>💰 ¥${Number(evt.expense).toLocaleString()}</span>
+              <span>💰 ${currSymbol}${Number(evt.expense).toLocaleString()}</span>
+              ${convertedStr}
               <span class="text-green-800">${paidStr}</span>
               <span class="text-gray-500 text-[10px]">${targetStr}</span>
             </div>`;
@@ -641,6 +690,7 @@
         if (found) {
           evt = { ...found };
           if (!evt.type) evt.type = 'spot';
+          if (!evt.currency) evt.currency = 'JPY';
           if (!evt.forMembers) evt.forMembers = [...allMembers];
         }
       }
@@ -664,6 +714,15 @@
         dayOptionsStart += `<option value="${d}" ${Number(evt.startDay) === d ? 'selected' : ''}>Day ${d}</option>`;
         dayOptionsEnd += `<option value="${d}" ${Number(evt.endDay) === d ? 'selected' : ''}>Day ${d}</option>`;
       }
+
+      // 通貨選択肢
+      const foreignCode = trip.currencyCode ? trip.currencyCode.toUpperCase() : null;
+      let currencySelectHTML = `
+        <select id="evt-currency" class="w-24 border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500 font-bold">
+          <option value="JPY" ${evt.currency === 'JPY' ? 'selected' : ''}>JPY (円)</option>
+          ${foreignCode ? `<option value="${foreignCode}" ${evt.currency === foreignCode ? 'selected' : ''}>${foreignCode}</option>` : ''}
+        </select>
+      `;
 
       const html = `
         <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -760,8 +819,11 @@
             <div class="border-t border-b py-3 space-y-3 bg-green-50/40 -mx-5 px-5">
               <span class="text-xs font-bold text-green-700 block border-b border-green-200/60 pb-1">💰 費用・負担管理</span>
               <div>
-                <label class="block text-[11px] font-bold text-gray-600 mb-1">金額 (円)</label>
-                <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：70640" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                <label class="block text-[11px] font-bold text-gray-600 mb-1">金額と通貨</label>
+                <div class="flex gap-2">
+                  <input id="evt-expense" type="number" step="any" value="${evt.expense}" placeholder="例：1500" class="flex-1 border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                  ${currencySelectHTML}
+                </div>
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った人</label>
@@ -878,7 +940,7 @@
         toLoc,
         bookingStatus: document.getElementById('evt-booking').value,
         expense: document.getElementById('evt-expense').value,
-        currency: 'JPY',
+        currency: document.getElementById('evt-currency').value,
         paidBy: document.getElementById('evt-paidBy').value,
         forMembers: checkedForMembers.length > 0 ? checkedForMembers : (trip.members ? [...trip.members] : ['自分']),
         memo: document.getElementById('evt-memo').value.trim()
@@ -905,73 +967,48 @@
       switchTab('itinerary');
     }
 
-    // --- 精算ロジック＆タップ展開明細機能 ---
-    function toggleMemberItems(index) {
-      const el = document.getElementById(`member-details-${index}`);
-      const arrow = document.getElementById(`member-arrow-${index}`);
-      if (el) {
-        el.classList.toggle('hidden');
-        if (arrow) {
-          arrow.classList.toggle('rotate-180');
-        }
-      }
-    }
+    // 精算ルート計算ヘルパー関数
+    function calculateTransfersForCurrency(members, targetCurrency, trip) {
+      const paidMap = {}, shareMap = {};
+      members.forEach(m => { paidMap[m] = 0; shareMap[m] = 0; });
 
-    function renderSettlement() {
-      const trip = getCurrentTrip();
-      if (!trip) return '';
-
-      const members = trip.members || ['自分'];
-      let grandTotalYen = 0;
-
-      const paidMap = {};
-      const shareMap = {};
-      const paidItemsMap = {};
-
-      members.forEach(m => { 
-        paidMap[m] = 0; 
-        shareMap[m] = 0; 
-        paidItemsMap[m] = [];
-      });
+      let grandTotal = 0;
 
       trip.schedule.forEach(s => {
         s.events.forEach(e => {
-          if (e.expense) {
-            const exp = Number(e.expense);
-            grandTotalYen += exp;
+          if (!e.expense) return;
+          const exp = Number(e.expense);
+          const curr = e.currency || 'JPY';
 
+          let effectiveAmount = 0;
+          if (targetCurrency === 'JPY_ONLY') {
+            if (curr === 'JPY') effectiveAmount = exp;
+          } else if (targetCurrency === 'FOREIGN_ONLY') {
+            if (curr === trip.currencyCode) effectiveAmount = exp;
+          } else if (targetCurrency === 'CONVERTED_TOTAL') {
+            if (curr === 'JPY') effectiveAmount = exp;
+            else if (trip.currencyRate > 0) effectiveAmount = exp * trip.currencyRate;
+          }
+
+          if (effectiveAmount > 0) {
+            grandTotal += effectiveAmount;
             const payer = e.paidBy || members[0];
-            if (paidMap[payer] !== undefined) {
-              paidMap[payer] += exp;
-              paidItemsMap[payer].push({
-                title: e.title || `${e.fromLoc || ''} ➔ ${e.toLoc || ''}`,
-                expense: exp,
-                forMembers: e.forMembers || members,
-                day: s.day
-              });
-            }
+            if (paidMap[payer] !== undefined) paidMap[payer] += effectiveAmount;
 
             const targets = (e.forMembers && e.forMembers.length > 0) ? e.forMembers : members;
-            const splitAmount = exp / targets.length;
-            targets.forEach(t => {
-              if (shareMap[t] !== undefined) shareMap[t] += splitAmount;
-            });
+            const split = effectiveAmount / targets.length;
+            targets.forEach(t => { if (shareMap[t] !== undefined) shareMap[t] += split; });
           }
         });
       });
 
-      const balances = members.map(m => {
-        return { 
-          name: m, 
-          balance: paidMap[m] - shareMap[m], 
-          paid: paidMap[m], 
-          share: shareMap[m],
-          items: paidItemsMap[m]
-        };
-      });
+      const balances = members.map(m => ({
+        name: m,
+        balance: paidMap[m] - shareMap[m]
+      }));
 
-      let debtors = balances.filter(b => b.balance < -1).map(b => ({ ...b, balance: -b.balance }));
-      let creditors = balances.filter(b => b.balance > 1).map(b => ({ ...b }));
+      let debtors = balances.filter(b => b.balance < -0.01).map(b => ({ ...b, balance: -b.balance }));
+      let creditors = balances.filter(b => b.balance > 0.01).map(b => ({ ...b }));
 
       const transfers = [];
       let dIdx = 0, cIdx = 0;
@@ -982,84 +1019,94 @@
         const amount = Math.min(debt.balance, cred.balance);
 
         if (amount > 0) {
-          transfers.push({ from: debt.name, to: cred.name, amount: Math.round(amount) });
+          transfers.push({ from: debt.name, to: cred.name, amount });
         }
 
         debt.balance -= amount;
         cred.balance -= amount;
 
-        if (debt.balance <= 1) dIdx++;
-        if (cred.balance <= 1) cIdx++;
+        if (debt.balance <= 0.01) dIdx++;
+        if (cred.balance <= 0.01) cIdx++;
       }
 
-      const balanceListHTML = balances.map((b, idx) => {
-        const itemsHTML = b.items.length > 0 ? b.items.map(item => `
-          <div class="flex justify-between items-center py-1.5 px-2 bg-gray-50 rounded text-[11px] text-gray-600">
-            <div>
-              <span class="font-bold text-gray-700">[Day ${item.day}] ${item.title}</span>
-              <span class="text-[10px] text-gray-400 block">対象: ${item.forMembers.join(', ')}</span>
-            </div>
-            <span class="font-bold text-gray-800">¥${item.expense.toLocaleString()}</span>
-          </div>
-        `).join('') : '<div class="text-[11px] text-gray-400 py-1 italic">支払った記録はありません</div>';
+      return { grandTotal, transfers };
+    }
 
-        return `
-          <div class="border-b border-gray-100 last:border-none">
-            <div onclick="toggleMemberItems(${idx})" class="flex justify-between items-center py-2.5 cursor-pointer hover:bg-gray-50/80 px-1 rounded transition select-none">
-              <div>
-                <div class="flex items-center gap-1">
-                  <span class="font-bold text-gray-800 text-xs">${b.name}</span>
-                  <i data-lucide="chevron-down" id="member-arrow-${idx}" class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"></i>
-                </div>
-                <div class="text-[10px] text-gray-400 mt-0.5">支払済: ¥${Math.round(b.paid).toLocaleString()} ｜ 負担額: ¥${Math.round(b.share).toLocaleString()}</div>
-              </div>
-              <div class="text-right">
-                <span class="font-bold text-xs ${b.balance >= 0 ? 'text-green-600' : 'text-red-500'}">
-                  ${b.balance >= 0 ? '+' : ''}¥${Math.round(b.balance).toLocaleString()}
-                </span>
-                <span class="text-[9px] text-gray-400 block">${b.items.length}件の支払</span>
-              </div>
-            </div>
-            <div id="member-details-${idx}" class="hidden pl-2 pr-1 pb-2.5 space-y-1">
-              <div class="text-[10px] font-bold text-gray-500 mb-1 border-l-2 border-blue-400 pl-1.5">${b.name} が支払った内訳一覧</div>
-              ${itemsHTML}
-            </div>
-          </div>
-        `;
-      }).join('');
+    // --- 精算画面レンダー ---
+    function renderSettlement() {
+      const trip = getCurrentTrip();
+      if (!trip) return '';
 
-      const transferListHTML = transfers.length > 0 ? transfers.map(t => `
-        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex justify-between items-center text-xs mb-2">
-          <div class="font-bold text-amber-900">
-            <span>${t.from}</span> <span class="text-amber-500">➔</span> <span>${t.to}</span>
+      const members = trip.members || ['自分'];
+      const foreignCode = trip.currencyCode ? trip.currencyCode.toUpperCase() : null;
+
+      // 1. JPYのみの精算
+      const jpyResult = calculateTransfersForCurrency(members, 'JPY_ONLY', trip);
+      // 2. 海外通貨のみの精算
+      const foreignResult = foreignCode ? calculateTransfersForCurrency(members, 'FOREIGN_ONLY', trip) : null;
+      // 3. 円換算（合算）の精算
+      const convertedResult = foreignCode ? calculateTransfersForCurrency(members, 'CONVERTED_TOTAL', trip) : null;
+
+      function renderTransferCards(transfers, symbol) {
+        if (!transfers || transfers.length === 0) {
+          return `<p class="text-xs text-gray-400 italic py-1">精算の必要はありません</p>`;
+        }
+        return transfers.map(t => `
+          <div class="bg-amber-50/80 border border-amber-200 p-2.5 rounded-xl flex justify-between items-center text-xs mb-1.5">
+            <div class="font-bold text-amber-900">
+              <span>${t.from}</span> <span class="text-amber-500">➔</span> <span>${t.to}</span>
+            </div>
+            <span class="font-extrabold text-amber-800 text-sm">${symbol}${Math.round(t.amount).toLocaleString()}</span>
           </div>
-          <span class="font-extrabold text-amber-700 text-sm">¥${t.amount.toLocaleString()}</span>
-        </div>
-      `).join('') : '<p class="text-xs text-gray-400 text-center py-2">精算の必要はありません</p>';
+        `).join('');
+      }
 
       return `
         <div class="space-y-4">
           <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow">
-            <p class="text-xs text-blue-100">旅程に登録された総費用</p>
-            <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round(grandTotalYen).toLocaleString()}</p>
+            <p class="text-xs text-blue-100">旅程全体の総費用（円換算）</p>
+            <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round(convertedResult ? convertedResult.grandTotal : jpyResult.grandTotal).toLocaleString()}</p>
+            ${foreignCode ? `<p class="text-[11px] text-amber-200 mt-1">※1 ${foreignCode} = ${trip.currencyRate}円 で計算</p>` : ''}
           </div>
 
+          <!-- パターン1: 円(JPY)のみの精算 -->
           <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <div class="flex justify-between items-center mb-1">
-              <h3 class="text-xs font-bold text-gray-700">🤝 メンバー別収支状況</h3>
-              <span class="text-[10px] text-blue-600">タップで支払明細を表示</span>
+            <div class="flex justify-between items-center mb-2 border-b pb-1.5">
+              <h3 class="text-xs font-bold text-gray-800 flex items-center gap-1">
+                <span>💴</span> 日本円 (JPY) で支払った分の精算
+              </h3>
+              <span class="text-xs font-extrabold text-green-700">小計: ¥${Math.round(jpyResult.grandTotal).toLocaleString()}</span>
             </div>
-            ${balanceListHTML}
+            ${renderTransferCards(jpyResult.transfers, '¥')}
           </div>
 
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h3 class="text-xs font-bold text-gray-700 mb-3">💡 最終精算ルート（清算一覧）</h3>
-            ${transferListHTML}
-          </div>
+          ${foreignCode ? `
+            <!-- パターン2: 設定した海外通貨のみの精算 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div class="flex justify-between items-center mb-2 border-b pb-1.5">
+                <h3 class="text-xs font-bold text-gray-800 flex items-center gap-1">
+                  <span>🔀</span> ${foreignCode} で支払った分の精算
+                </h3>
+                <span class="text-xs font-extrabold text-amber-700">小計: ${foreignCode} ${Math.round(foreignResult.grandTotal).toLocaleString()}</span>
+              </div>
+              ${renderTransferCards(foreignResult.transfers, `${foreignCode} `)}
+            </div>
+
+            <!-- パターン3: 円換算後の総合精算 -->
+            <div class="bg-blue-50/60 p-4 rounded-xl shadow-sm border border-blue-200">
+              <div class="flex justify-between items-center mb-2 border-b border-blue-200 pb-1.5">
+                <h3 class="text-xs font-bold text-blue-900 flex items-center gap-1">
+                  <span>🌐</span> ${foreignCode}を円換算して一括で清算する場合
+                </h3>
+                <span class="text-xs font-extrabold text-blue-700">合計: 約 ¥${Math.round(convertedResult.grandTotal).toLocaleString()}</span>
+              </div>
+              ${renderTransferCards(convertedResult.transfers, '¥')}
+            </div>
+          ` : ''}
         </div>`;
     }
 
-    // --- AI相談・チャット多行解析機能 ---
+    // --- AI相談 ---
     function renderAI() {
       const trip = getCurrentTrip();
       if (!trip) return '';
@@ -1267,24 +1314,67 @@
       switchTab('itinerary');
     }
 
+    // --- 持ち物自動生成ロジック付き持ち物画面 ---
+    function autoGenerateBelongings() {
+      const trip = getCurrentTrip();
+      if (!trip) return;
+
+      const dest = trip.destination || "";
+      const title = trip.title || "";
+      const fullText = dest + " " + title;
+
+      let addedItems = [];
+      const baseItems = ["着替え", "充電器", "現金 / クレジットカード", "健康保険証"];
+
+      destinationPresets.forEach(preset => {
+        const isMatch = preset.keywords.some(kw => fullText.includes(kw));
+        if (isMatch) {
+          addedItems = addedItems.concat(preset.items);
+        }
+      });
+
+      const currentItems = trip.belongings.map(b => b.item);
+      const newItems = [...baseItems, ...addedItems].filter(item => !currentItems.includes(item));
+
+      if (newItems.length === 0) {
+        alert("既に行き先に合わせた持ち物が登録されているか、該当する自動提案が見つかりませんでした。");
+        return;
+      }
+
+      newItems.forEach(item => {
+        trip.belongings.push({ id: Date.now() + Math.random(), item, checked: false });
+      });
+
+      saveTrips();
+      switchTab('belongings');
+      alert(`「${dest}」に合わせた持ち物（${newItems.length}件）を自動追加しました！`);
+    }
+
     function renderBelongings() {
       const trip = getCurrentTrip();
       if (!trip) return '';
 
       return `
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <h2 class="text-sm font-bold text-gray-700 mb-3">持ち物チェックリスト</h2>
-          <div class="space-y-2">
-            ${trip.belongings.map(b => `
-              <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded border-b border-gray-50 last:border-none">
-                <div class="flex items-center gap-2">
-                  <input type="checkbox" ${b.checked ? 'checked' : ''} onchange="toggleBelonging(${b.id})" class="w-4 h-4 text-blue-600 rounded">
-                  <span class="${b.checked ? 'line-through text-gray-400' : 'text-gray-700'}">${b.item}</span>
-                </div>
-              </label>
-            `).join('')}
+        <div class="space-y-3">
+          <button onclick="autoGenerateBelongings()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-2.5 px-3 rounded-xl shadow-sm text-xs flex items-center justify-center gap-1.5 hover:from-emerald-600 hover:to-teal-700 transition">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>📍 行き先（${trip.destination || '目的地'}）から持ち物を自動生成</span>
+          </button>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h2 class="text-sm font-bold text-gray-700 mb-3">持ち物チェックリスト</h2>
+            <div class="space-y-2">
+              ${trip.belongings.map(b => `
+                <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded border-b border-gray-50 last:border-none">
+                  <div class="flex items-center gap-2">
+                    <input type="checkbox" ${b.checked ? 'checked' : ''} onchange="toggleBelonging(${b.id})" class="w-4 h-4 text-blue-600 rounded">
+                    <span class="${b.checked ? 'line-through text-gray-400' : 'text-gray-700'}">${b.item}</span>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+            <button onclick="addBelongingPrompt()" class="mt-3 w-full py-2 text-xs text-blue-600 font-bold bg-blue-50 rounded-lg hover:bg-blue-100">+ 持ち物を手動で追加</button>
           </div>
-          <button onclick="addBelongingPrompt()" class="mt-3 w-full py-2 text-xs text-blue-600 font-bold bg-blue-50 rounded-lg hover:bg-blue-100">+ 持ち物を追加</button>
         </div>`;
     }
 
