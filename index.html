@@ -58,7 +58,7 @@
     </button>
     <button onclick="switchTab('ai')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-ai">
       <i data-lucide="sparkles" class="w-5 h-5"></i>
-      <span class="text-xs mt-1">AI相談</span>
+      <span class="text-xs mt-1">AI解析</span>
     </button>
   </nav>
 
@@ -123,7 +123,7 @@
           { id: 2, item: "変圧器", checked: false }
         ],
         chatHistory: [
-          { sender: 'ai', text: 'こんにちは！旅行特化AIです。何でもご相談ください！' }
+          { sender: 'ai', text: 'LINEやチャットの文章（例:「Day1 15:00 トイ・ストーリーホテル 15000円 たろう支払」など）を送信してください！フォーマットに合わせて自動解析・流し込みます。' }
         ]
       }
     ];
@@ -132,7 +132,6 @@
     let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
     let openMemberDetails = {};
 
-    // --- 共有URL解析（URLハッシュから旅行データを読み込む） ---
     function checkSharedURL() {
       if (window.location.hash.startsWith('#trip=')) {
         try {
@@ -201,7 +200,6 @@
       }
     }
 
-    // --- 1. 旅行一覧 ＆ 新規・編集機能 ---
     function renderTrips() {
       const tripListHTML = trips.map(t => {
         const isActive = t.id === activeTripId;
@@ -429,7 +427,7 @@
             { id: 1, item: "パスポート", checked: false },
             { id: 2, item: "充電器", checked: false }
           ],
-          chatHistory: [{ sender: 'ai', text: `「${title}」の計画ですね！何でもご相談ください！` }]
+          chatHistory: [{ sender: 'ai', text: `「${title}」の計画ですね！チャット文を解析して自動登録できます！` }]
         };
         trips.unshift(newTrip);
         activeTripId = newTrip.id;
@@ -450,7 +448,6 @@
       document.getElementById('modal-container').innerHTML = '';
     }
 
-    // --- 2. ホーム画面 ---
     function renderHome() {
       const trip = getCurrentTrip();
       if (!trip) return renderTrips();
@@ -478,7 +475,6 @@
         </div>`;
     }
 
-    // --- 3. 旅程画面 ---
     function getBookingBadge(status) {
       if (status === 'reserved') {
         return `<span class="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded border border-green-300">✅ 予約済み</span>`;
@@ -629,7 +625,6 @@
       }
     }
 
-    // --- 4. 予定入力・編集モーダル ---
     let tempEventImages = [];
 
     function openEventModal(eventId = null) {
@@ -994,7 +989,6 @@
       switchTab('itinerary');
     }
 
-    // --- 5. 精算画面 ---
     function toggleMemberDetail(memberName) {
       openMemberDetails[memberName] = !openMemberDetails[memberName];
       switchTab('settlement');
@@ -1150,23 +1144,43 @@
         </div>`;
     }
 
-    // --- 6. AI相談画面 ---
+    // --- 6. AI相談・チャット解析画面 ---
     function renderAI() {
       const trip = getCurrentTrip();
       if (!trip) return '';
 
       if (!trip.chatHistory) {
-        trip.chatHistory = [{ sender: 'ai', text: 'こんにちは！旅行特化AIです。何でもご相談ください！' }];
+        trip.chatHistory = [{ sender: 'ai', text: 'LINEやチャットの文章（例:「Day1 15:00 トイ・ストーリーホテル 15000円 たろう支払」など）を送信してください！フォーマットに合わせて自動解析・流し込みます。' }];
       }
 
-      let chatLogs = trip.chatHistory.map(msg => {
+      let chatLogs = trip.chatHistory.map((msg, index) => {
         if (msg.sender === 'user') {
           return `<div class="flex justify-end mb-3"><div class="bg-blue-600 text-white p-3 rounded-2xl rounded-tr-none text-xs max-w-[80%]">${msg.text}</div></div>`;
         } else {
+          let parsedCard = '';
+          if (msg.parsedEvent) {
+            const pe = msg.parsedEvent;
+            parsedCard = `
+              <div class="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1 text-xs">
+                <div class="flex justify-between items-center font-bold text-blue-900 border-b border-blue-200 pb-1">
+                  <span>✨ 抽出結果 (Day ${pe.day})</span>
+                  <span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[10px]">${pe.type === 'hotel' ? '🏨 宿泊' : (pe.type === 'move' ? '🚌 移動' : '📍 スポット')}</span>
+                </div>
+                <div><b>名称/内容:</b> ${pe.title || (pe.fromLoc + ' ➔ ' + pe.toLoc)}</div>
+                ${pe.time ? `<div><b>時間:</b> ${pe.time} ${pe.endTime ? '〜 ' + pe.endTime : ''}</div>` : ''}
+                ${pe.expense ? `<div><b>費用:</b> ${pe.currency || 'JPY'} ${pe.expense} (${pe.paidBy || '自分'} 支払)</div>` : ''}
+                ${pe.memo ? `<div class="text-gray-500"><b>メモ:</b> ${pe.memo}</div>` : ''}
+                <button onclick="applyParsedEvent(${index})" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow-sm">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> 旅程にこの予定を追加する
+                </button>
+              </div>
+            `;
+          }
+
           return `
             <div class="flex justify-start mb-3 gap-2">
               <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">AI</div>
-              <div class="bg-white border p-3 rounded-2xl rounded-tl-none text-xs max-w-[85%] shadow-sm text-gray-800 whitespace-pre-wrap">${msg.text}</div>
+              <div class="bg-white border p-3 rounded-2xl rounded-tl-none text-xs max-w-[85%] shadow-sm text-gray-800 whitespace-pre-wrap">${msg.text}${parsedCard}</div>
             </div>`;
         }
       }).join('');
@@ -1175,15 +1189,15 @@
         <div class="flex flex-col h-[calc(100vh-140px)]">
           <div class="bg-blue-50 border border-blue-200 rounded-xl p-2.5 mb-3 flex items-center gap-2">
             <i data-lucide="sparkles" class="w-4 h-4 text-blue-600 shrink-0"></i>
-            <p class="text-[11px] text-blue-800 leading-tight">現在AI機能はデモモードです。</p>
+            <p class="text-[11px] text-blue-800 leading-tight">LINEなどのメモを貼ると、既存フォーマットへ自動登録できます！</p>
           </div>
 
           <div class="flex-1 overflow-y-auto pr-1" id="chat-box">
             ${chatLogs}
           </div>
           <div class="mt-2 flex gap-2">
-            <input id="ai-input" type="text" placeholder="おすすめのランチ教えて！など" class="flex-1 border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
-            <button onclick="sendAIMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shrink-0">送信</button>
+            <input id="ai-input" type="text" placeholder="例: Day1 15:00 トイ・ストーリーホテル 15000円 たろう支払" class="flex-1 border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+            <button onclick="sendAIMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shrink-0">解析・送信</button>
           </div>
         </div>
       `;
@@ -1200,17 +1214,119 @@
       trip.chatHistory.push({ sender: 'user', text: val });
       
       setTimeout(() => {
-        const dummyReply = `「${val}」ですね！\n「${trip.title}」（${trip.destination}）の旅程に合わせて提案します！`;
-        trip.chatHistory.push({ sender: 'ai', text: dummyReply });
+        const parsed = parseTextToEvent(val, trip);
+        let replyText = "テキストから予定情報を解析しました！\n内容を確認して、下のボタンで旅程に追加できます。";
+        
+        if (!parsed.title && !parsed.fromLoc) {
+          replyText = "チャットの読み取りを行いました！質問への返答や、具体的な時間・場所・金額が含まれていれば旅程への流し込みカードを作成します。";
+        }
+
+        trip.chatHistory.push({ 
+          sender: 'ai', 
+          text: replyText,
+          parsedEvent: (parsed.title || parsed.fromLoc) ? parsed : null
+        });
         saveTrips();
         switchTab('ai');
-      }, 400);
+      }, 300);
 
       saveTrips();
       switchTab('ai');
     }
 
-    // --- 7. 持ち物画面 ---
+    // チャットテキストから既存のイベントフォーマットに合うオブジェクトをパース生成
+    function parseTextToEvent(text, trip) {
+      let day = trip.activeDay || 1;
+      const dayMatch = text.match(/(?:day|Day|日目)\s*(\d+)/);
+      if (dayMatch) day = Math.min(parseInt(dayMatch[1]), trip.daysCount);
+
+      let type = 'spot';
+      if (/ホテル|宿|チェックイン|旅館|宿泊|ゲストハウス/i.test(text)) {
+        type = 'hotel';
+      } else if (/→|➔|->|空港|駅|タクシー|バス|電車|移動|行き/i.test(text)) {
+        type = 'move';
+      }
+
+      let time = '', endTime = '';
+      const times = text.match(/(\d{1,2}:\d{2})/g);
+      if (times) {
+        time = times[0];
+        if (times[1]) endTime = times[1];
+      }
+
+      let expense = '';
+      const expMatch = text.match(/(\d+[\d,]*)\s*(?:円|CNY|USD|元)/);
+      if (expMatch) expense = expMatch[1].replace(/,/g, '');
+
+      let currency = trip.currencies ? trip.currencies[0].code : 'JPY';
+      if (/CNY|元/i.test(text)) currency = 'CNY';
+      if (/USD|\$/i.test(text)) currency = 'USD';
+      if (/円|JPY/i.test(text)) currency = 'JPY';
+
+      let paidBy = trip.members ? trip.members[0] : '自分';
+      if (trip.members) {
+        trip.members.forEach(m => {
+          if (text.includes(m)) paidBy = m;
+        });
+      }
+
+      let title = '', fromLoc = '', toLoc = '';
+      if (type === 'move') {
+        const moveSplit = text.split(/→|➔|->/);
+        if (moveSplit.length >= 2) {
+          fromLoc = moveSplit[0].replace(/.*?(?:Day\d+|[\d:]+|\s)+/, '').trim();
+          toLoc = moveSplit[1].replace(/[\d,]+(?:円|CNY|USD|元).*/, '').trim();
+        } else {
+          fromLoc = "出発地";
+          toLoc = "到着地";
+        }
+        title = "移動";
+      } else {
+        title = text.replace(/(?:Day\d+|[\d:]+|\d+円|\d+CNY|たろう|はなこ|チェックイン|予約|不要|済み)/g, '').trim();
+        if (!title) title = type === 'hotel' ? '宿泊施設' : '予定スポット';
+      }
+
+      return {
+        id: 'evt_' + Date.now(),
+        type,
+        day,
+        title,
+        time,
+        endTime,
+        startDay: day,
+        endDay: Math.min(day + 1, trip.daysCount),
+        fromLoc,
+        toLoc,
+        bookingStatus: /予約済み|予約済|予約有/.test(text) ? 'reserved' : (/要予約|未予約/.test(text) ? 'unreserved' : 'unnecessary'),
+        expense,
+        currency,
+        paidBy,
+        forMembers: trip.members ? [...trip.members] : ['自分'],
+        url: '',
+        memo: text,
+        images: []
+      };
+    }
+
+    // 解析されたイベントを実際のスケジュールデータに注入する
+    function applyParsedEvent(historyIndex) {
+      const trip = getCurrentTrip();
+      const msg = trip.chatHistory[historyIndex];
+      if (!msg || !msg.parsedEvent) return;
+
+      const pe = msg.parsedEvent;
+      const targetSchedule = trip.schedule.find(s => s.day === pe.day) || trip.schedule[0];
+
+      targetSchedule.events.push({ ...pe });
+      trip.activeDay = pe.day;
+
+      delete msg.parsedEvent;
+      saveTrips();
+
+      alert(`「${pe.title || pe.fromLoc}」を Day ${pe.day} の旅程に追加しました！`);
+      switchTab('itinerary');
+    }
+
     function renderBelongings() {
       const trip = getCurrentTrip();
       if (!trip) return '';
@@ -1253,7 +1369,6 @@
       switchTab('belongings');
     }
 
-    // --- タブ切り替え ---
     const views = {
       home: renderHome,
       itinerary: renderItinerary,
@@ -1281,7 +1396,6 @@
       lucide.createIcons();
     }
 
-    // 初期化（URL共有からのアクセスチェックを含む）
     checkSharedURL();
     switchTab('home');
   </script>
