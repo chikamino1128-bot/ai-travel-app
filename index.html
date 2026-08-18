@@ -3,313 +3,1188 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tabiori風 旅行しおりアプリ</title>
-  <!-- Tailwind CSS -->
+  <title>Tabiori 風 旅行しおりアプリ</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-100 min-h-screen text-gray-800 flex justify-center">
+<body class="bg-gray-100 text-gray-800 font-sans pb-24">
 
-  <!-- アプリのメインコンテナ（スマホ風の幅制限） -->
-  <div class="w-full max-w-md bg-slate-50 min-h-screen flex flex-col shadow-xl relative pb-20">
-
-    <!-- ヘッダー -->
-    <header class="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
-      <div class="flex justify-between items-center">
-        <div>
-          <h1 id="header-title" class="text-lg font-bold">旅行しおり</h1>
-          <p id="header-subtitle" class="text-xs text-blue-100">旅の計画をみんなで共有</p>
-        </div>
-        <button onclick="switchTab('trips')" class="bg-blue-700 hover:bg-blue-800 text-xs px-3 py-1.5 rounded-full flex items-center gap-1 transition">
-          <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
-          <span>旅行一覧</span>
+  <!-- ヘッダー -->
+  <header class="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <div>
+        <h1 id="header-title" class="text-lg font-bold">旅行しおり</h1>
+        <p id="header-sub" class="text-xs text-blue-100">旅行を選択してください</p>
+      </div>
+      <div class="flex gap-1.5">
+        <button onclick="shareActiveTrip()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold" title="共有URLをコピー">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+          <span>共有</span>
+        </button>
+        <button onclick="showEditTripModal()" class="bg-blue-700 hover:bg-blue-800 text-white text-xs p-2 rounded-lg flex items-center justify-center font-bold" title="旅行設定の変更">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+        <button onclick="switchTab('trips')" class="bg-blue-700 hover:bg-blue-800 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold">
+          <i data-lucide="folder" class="w-4 h-4"></i>
+          <span>一覧</span>
         </button>
       </div>
-    </header>
+    </div>
+  </header>
 
-    <!-- メインコンテンツ表示エリア -->
-    <main id="app-content" class="p-4 flex-1">
-      <!-- JavaScriptでコンテンツが動的に描画されます -->
-    </main>
+  <!-- メインコンテンツ表示エリア -->
+  <main id="app-content" class="p-4 max-w-md mx-auto"></main>
 
-    <!-- 下部固定ナビゲーションバー -->
-    <nav class="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-200 py-2 px-3 flex justify-around text-xs z-20">
-      <button onclick="switchTab('home')" id="tab-home" class="tab-btn flex flex-col items-center text-blue-600 font-bold">
-        <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
-        <span>ホーム</span>
-      </button>
-      <button onclick="switchTab('itinerary')" id="tab-itinerary" class="tab-btn flex flex-col items-center text-gray-400">
-        <i data-lucide="calendar" class="w-5 h-5 mb-0.5"></i>
-        <span>日程表</span>
-      </button>
-      <button onclick="switchTab('belongings')" id="tab-belongings" class="tab-btn flex flex-col items-center text-gray-400">
-        <i data-lucide="check-square" class="w-5 h-5 mb-0.5"></i>
-        <span>持ち物</span>
-      </button>
-      <button onclick="switchTab('settlement')" id="tab-settlement" class="tab-btn flex flex-col items-center text-gray-400">
-        <i data-lucide="calculator" class="w-5 h-5 mb-0.5"></i>
-        <span>割り勘</span>
-      </button>
-      <button onclick="switchTab('ai')" id="tab-ai" class="tab-btn flex flex-col items-center text-gray-400">
-        <i data-lucide="sparkles" class="w-5 h-5 mb-0.5"></i>
-        <span>AI解析</span>
-      </button>
-    </nav>
+  <!-- モーダル表示領域 -->
+  <div id="modal-container"></div>
 
-  </div>
+  <!-- 下部タブバー -->
+  <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 max-w-md mx-auto z-20">
+    <button onclick="switchTab('home')" class="tab-btn flex flex-col items-center text-blue-600" id="tab-home">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">ホーム</span>
+    </button>
+    <button onclick="switchTab('itinerary')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-itinerary">
+      <i data-lucide="calendar" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">旅程</span>
+    </button>
+    <button onclick="switchTab('belongings')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-belongings">
+      <i data-lucide="check-square" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">持ち物</span>
+    </button>
+    <button onclick="switchTab('settlement')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-settlement">
+      <i data-lucide="japanese-yen" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">精算</span>
+    </button>
+    <button onclick="switchTab('ai')" class="tab-btn flex flex-col items-center text-gray-400" id="tab-ai">
+      <i data-lucide="sparkles" class="w-5 h-5"></i>
+      <span class="text-xs mt-1">AI解析</span>
+    </button>
+  </nav>
 
   <script>
-    // --- 初期データ ＆ ローカルストレージ管理 ---
-    const DEFAULT_DATA = [
+    const defaultTrips = [
       {
-        id: "trip-1",
-        title: "東京観光旅行",
-        dates: "2026/05/10 - 2026/05/11",
-        members: ["あなた", "たろう", "はなこ"],
-        itinerary: [
-          { day: 1, time: "10:00", title: "東京駅集合", memo: "丸ノ内中央口で集合！" },
-          { day: 1, time: "12:00", title: "浅草でランチ", memo: "天丼を食べる予定" },
-          { day: 2, time: "11:00", title: "チームラボ豊洲", memo: "事前チケット購入済み" }
+        id: "trip_default_1",
+        title: "別府温泉旅行",
+        destination: "大分・別府",
+        startDate: "2026-09-19",
+        endDate: "2026-09-21",
+        nightsText: "2泊3日",
+        daysCount: 3,
+        members: ["自分", "メンバー2"],
+        currencies: [{ code: "JPY", rate: 1.0 }],
+        activeDay: 1,
+        schedule: [
+          { day: 1, date: "1日目", events: [] },
+          { day: 2, date: "2日目", events: [] },
+          { day: 3, date: "3日目", events: [] }
         ],
         belongings: [
-          { id: 1, item: "新幹線のチケット", checked: true },
-          { id: 2, item: "着替え（1泊分）", checked: false },
-          { id: 3, item: "スマホ充電器", checked: false }
+          { id: 1, item: "着替え", checked: false },
+          { id: 2, item: "充電器", checked: false }
         ],
-        expenses: [
-          { id: 1, title: "新幹線代", amount: 15000, payer: "あなた" },
-          { id: 2, title: "初日ランチ代", amount: 4500, payer: "たろう" }
+        chatHistory: [
+          { sender: 'ai', text: '旅程テキスト（1行でも複数行でもOK）を貼り付けて送信してください！自動で解析してカードを作成します。' }
         ]
       }
     ];
 
-    function loadTrips() {
-      const data = localStorage.getItem('tabiori_trips');
-      if (!data) {
-        localStorage.setItem('tabiori_trips', JSON.stringify(DEFAULT_DATA));
-        return DEFAULT_DATA;
+    let trips = JSON.parse(localStorage.getItem('my_trips')) || defaultTrips;
+    let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
+
+    function checkSharedURL() {
+      if (window.location.hash.startsWith('#trip=')) {
+        try {
+          const encodedData = window.location.hash.replace('#trip=', '');
+          const jsonStr = decodeURIComponent(atob(encodedData));
+          const importedTrip = JSON.parse(jsonStr);
+
+          if (importedTrip && importedTrip.id && importedTrip.title) {
+            const existingIdx = trips.findIndex(t => t.id === importedTrip.id);
+            if (existingIdx !== -1) {
+              trips[existingIdx] = importedTrip;
+            } else {
+              trips.unshift(importedTrip);
+            }
+            activeTripId = importedTrip.id;
+            saveTrips();
+            alert(`「${importedTrip.title}」の旅行データを共有URLから読み込みました！`);
+            history.replaceState(null, '', window.location.pathname);
+          }
+        } catch (e) {
+          console.error("共有データのパースに失敗しました", e);
+        }
       }
-      return JSON.parse(data);
+    }
+
+    function shareActiveTrip() {
+      const trip = getCurrentTrip();
+      if (!trip) return;
+
+      try {
+        const jsonStr = JSON.stringify(trip);
+        const encodedData = btoa(encodeURIComponent(jsonStr));
+        const shareURL = `${window.location.origin}${window.location.pathname}#trip=${encodedData}`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareURL).then(() => {
+            alert(`「${trip.title}」の編集用共有URLをクリップボードにコピーしました！`);
+          });
+        } else {
+          prompt("以下のURLをコピーして友達に共有してください：", shareURL);
+        }
+      } catch (e) {
+        alert("データの容量が大きすぎるため共有URLを作成できませんでした。");
+      }
     }
 
     function saveTrips() {
-      localStorage.setItem('tabiori_trips', JSON.stringify(trips));
+      localStorage.setItem('my_trips', JSON.stringify(trips));
+      localStorage.setItem('active_trip_id', activeTripId);
     }
 
     function getCurrentTrip() {
-      return trips.find(t => t.id === currentTripId) || trips[0];
+      return trips.find(t => t.id === activeTripId) || trips[0];
     }
 
-    let trips = loadTrips();
-    let currentTripId = trips[0] ? trips[0].id : null;
-
-    // --- 1. ヘッダー更新 ---
     function updateHeader() {
       const trip = getCurrentTrip();
-      const titleEl = document.getElementById('header-title');
-      const subtitleEl = document.getElementById('header-subtitle');
       if (trip) {
-        titleEl.innerText = trip.title;
-        subtitleEl.innerText = trip.dates;
+        document.getElementById('header-title').innerText = trip.title;
+        const dur = trip.nightsText || `${trip.daysCount}日間`;
+        const mCount = trip.members ? trip.members.length : 1;
+        document.getElementById('header-sub').innerText = `${trip.destination} / ${dur} (${mCount}名)`;
       } else {
-        titleEl.innerText = "旅行しおり";
-        subtitleEl.innerText = "旅行を作成・選択してください";
+        document.getElementById('header-title').innerText = "旅行しおり";
+        document.getElementById('header-sub').innerText = "旅行を選択してください";
       }
     }
 
-    // --- 2. 旅行切り替え・作成画面 ---
     function renderTrips() {
-      return `
-        <div class="space-y-4">
-          <h2 class="text-md font-bold text-gray-700">旅行一覧</h2>
-          <div class="space-y-2">
-            ${trips.map(t => `
-              <div onclick="selectTrip('${t.id}')" class="p-3 bg-white rounded-xl shadow-sm border ${t.id === currentTripId ? 'border-blue-500 bg-blue-50/30' : 'border-gray-100'} flex justify-between items-center cursor-pointer">
-                <div>
-                  <div class="font-bold text-sm text-gray-800">${t.title}</div>
-                  <div class="text-xs text-gray-500">${t.dates}</div>
-                </div>
-                ${t.id === currentTripId ? '<span class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">選択中</span>' : ''}
+      const tripListHTML = trips.map(t => {
+        const isActive = t.id === activeTripId;
+        const dur = t.nightsText || `${t.daysCount}日間`;
+        return `
+          <div class="bg-white p-4 rounded-xl border ${isActive ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'} shadow-sm mb-3 flex justify-between items-center">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-gray-800">${t.title}</h3>
+                ${isActive ? '<span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">選択中</span>' : ''}
               </div>
-            `).join('')}
-          </div>
-
-          <div class="pt-4 border-t border-gray-200">
-            <h3 class="text-xs font-bold text-gray-500 mb-2">新しい旅行を作成</h3>
-            <div class="space-y-2">
-              <input id="new-trip-title" type="text" placeholder="旅行タイトル（例: 沖縄リゾート旅）" class="w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
-              <input id="new-trip-dates" type="text" placeholder="日程（例: 2026/08/01 - 2026/08/03）" class="w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
-              <button onclick="createNewTrip()" class="w-full bg-blue-600 text-white text-xs py-2 rounded-lg font-bold shadow-sm hover:bg-blue-700">新規作成</button>
+              <p class="text-xs text-gray-500 mt-1">📍 ${t.destination} ｜ 🗓 ${dur}</p>
             </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function selectTrip(id) {
-      currentTripId = id;
-      switchTab('home');
-    }
-
-    function createNewTrip() {
-      const title = document.getElementById('new-trip-title').value.trim();
-      const dates = document.getElementById('new-trip-dates').value.trim();
-      if (!title) return alert('タイトルを入力してください');
-
-      const newTrip = {
-        id: `trip-${Date.now()}`,
-        title: title,
-        dates: dates || "日程未定",
-        members: ["あなた"],
-        itinerary: [],
-        belongings: [],
-        expenses: []
-      };
-
-      trips.push(newTrip);
-      currentTripId = newTrip.id;
-      saveTrips();
-      switchTab('home');
-    }
-
-    // --- 3. ホーム画面 ---
-    function renderHome() {
-      const trip = getCurrentTrip();
-      if (!trip) return '<div class="text-center text-xs text-gray-400">旅行データがありません</div>';
-
-      return `
-        <div class="space-y-4">
-          <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-4 text-white shadow-md">
-            <div class="text-xs text-blue-100">ようこそ！</div>
-            <div class="text-xl font-extrabold mt-1">${trip.title}</div>
-            <div class="text-xs text-blue-100 mt-0.5">${trip.dates}</div>
-            
-            <div class="mt-4 pt-3 border-t border-white/20 flex justify-between items-center text-xs">
-              <span>メンバー: ${trip.members.join(', ')}</span>
-              <button onclick="shareTrip()" class="bg-white/20 hover:bg-white/30 px-2 py-1 rounded flex items-center gap-1">
-                <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-                <span>共有</span>
+            <div class="flex gap-1.5">
+              <button onclick="selectTrip('${t.id}')" class="text-xs ${isActive ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700'} font-bold px-3 py-1.5 rounded-lg">
+                ${isActive ? '表示中' : '開く'}
               </button>
             </div>
           </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div onclick="switchTab('itinerary')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer">
-              <div class="flex items-center gap-2 text-blue-600">
-                <i data-lucide="calendar" class="w-4 h-4"></i>
-                <span class="text-xs font-bold">予定数</span>
-              </div>
-              <div class="text-xl font-bold text-gray-800 mt-2">${trip.itinerary.length} 件</div>
-            </div>
-            <div onclick="switchTab('belongings')" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between cursor-pointer">
-              <div class="flex items-center gap-2 text-indigo-600">
-                <i data-lucide="check-square" class="w-4 h-4"></i>
-                <span class="text-xs font-bold">持ち物</span>
-              </div>
-              <div class="text-xl font-bold text-gray-800 mt-2">
-                ${trip.belongings.filter(b => b.checked).length} / ${trip.belongings.length}
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h2 class="text-xs font-bold text-gray-500 mb-3">次の予定</h2>
-            ${trip.itinerary.length > 0 ? `
-              <div class="border-l-2 border-blue-500 pl-3 py-1">
-                <div class="text-xs font-bold text-blue-600">${trip.itinerary[0].time}</div>
-                <div class="text-sm font-bold text-gray-800">${trip.itinerary[0].title}</div>
-                <div class="text-xs text-gray-500">${trip.itinerary[0].memo || 'メモなし'}</div>
-              </div>
-            ` : `
-              <div class="text-xs text-gray-400 text-center py-2">予定がまだ登録されていません</div>
-            `}
-          </div>
-        </div>
-      `;
-    }
-
-    function shareTrip() {
-      const trip = getCurrentTrip();
-      const jsonStr = encodeURIComponent(JSON.stringify(trip));
-      const shareUrl = `${window.location.origin}${window.location.pathname}?data=${jsonStr}`;
-      
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert("共有用URLをクリップボードにコピーしました！");
-      }).catch(() => {
-        alert("URLのコピーに失敗しました。");
-      });
-    }
-
-    // --- 4. 日程表画面 ---
-    function renderItinerary() {
-      const trip = getCurrentTrip();
-      if (!trip) return '';
+        `;
+      }).join('');
 
       return `
         <div class="space-y-4">
-          <div class="flex justify-between items-center">
-            <h2 class="text-sm font-bold text-gray-700">タイムスケジュール</h2>
-          </div>
+          <button onclick="showCreateTripModal()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold p-3.5 rounded-xl shadow flex items-center justify-center gap-2">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <span>新しい旅行を作成する</span>
+          </button>
+          <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">作成済みの旅行一覧</h2>
+          <div>${tripListHTML}</div>
+        </div>
+      `;
+    }
 
-          <div class="space-y-3">
-            ${trip.itinerary.map((item, idx) => `
-              <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative">
-                <div class="flex justify-between items-start">
-                  <div class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">${item.time}</div>
-                  <button onclick="deleteItinerary(${idx})" class="text-gray-300 hover:text-red-500 text-xs px-1">✕</button>
-                </div>
-                <div class="text-sm font-bold text-gray-800 mt-1.5">${item.title}</div>
-                ${item.memo ? `<div class="text-xs text-gray-500 mt-1 bg-gray-50 p-1.5 rounded">${item.memo}</div>` : ''}
-              </div>
-            `).join('')}
-          </div>
+    function showCreateTripModal(isEdit = false) {
+      const trip = isEdit ? getCurrentTrip() : null;
+      const titleVal = trip ? trip.title : '';
+      const destVal = trip ? trip.destination : '';
+      const startVal = trip ? trip.startDate : '';
+      const endVal = trip ? trip.endDate : '';
+      const members = trip && trip.members ? trip.members : ['自分', 'メンバー2'];
 
-          <div class="bg-white p-3 rounded-xl border border-dashed border-gray-300 space-y-2 mt-4">
-            <div class="text-xs font-bold text-gray-600">予定を手動で追加</div>
-            <div class="grid grid-cols-3 gap-2">
-              <input id="add-time" type="time" class="border rounded-lg p-1.5 text-xs">
-              <input id="add-title" type="text" placeholder="予定名" class="col-span-2 border rounded-lg p-1.5 text-xs">
+      const html = `
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div class="bg-white p-5 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md my-8 space-y-3">
+            <h2 class="text-base font-bold text-gray-800 border-b pb-2">${isEdit ? '⚙️ 旅行設定の変更' : '✈️ 新しい旅行を作成'}</h2>
+            
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">旅行タイトル</label>
+              <input id="new-title" type="text" value="${titleVal}" placeholder="例：別府温泉旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
-            <input id="add-memo" type="text" placeholder="メモ（場所や補足など）" class="w-full border rounded-lg p-1.5 text-xs">
-            <button onclick="addItineraryItem()" class="w-full bg-blue-600 text-white text-xs py-2 rounded-lg font-bold">追加する</button>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">行き先</label>
+              <input id="new-destination" type="text" value="${destVal}" placeholder="例：大分・別府" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">出発日</label>
+                <input id="new-start-date" type="date" value="${startVal}" onchange="calculateNights()" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">到着日</label>
+                <input id="new-end-date" type="date" value="${endVal}" onchange="calculateNights()" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
+            </div>
+
+            <div id="nights-display" class="text-xs font-bold text-blue-600 bg-blue-50 p-2 rounded-lg text-center hidden">
+              期間: <span id="nights-text"></span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">人数</label>
+              <select id="new-member-count" onchange="updateMemberInputs()" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                ${[1,2,3,4,5,6].map(n => `<option value="${n}" ${members.length === n ? 'selected' : ''}>${n}名</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">メンバーの名前</label>
+              <div id="member-inputs-container" class="space-y-1.5"></div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t">
+              <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-lg text-xs">キャンセル</button>
+              <button onclick="saveTripSettings(${isEdit})" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-blue-700">${isEdit ? '設定を保存' : '作成する'}</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('modal-container').innerHTML = html;
+      updateMemberInputs(members);
+      calculateNights();
+    }
+
+    function showEditTripModal() { showCreateTripModal(true); }
+
+    function calculateNights() {
+      const startVal = document.getElementById('new-start-date').value;
+      const endVal = document.getElementById('new-end-date').value;
+      const display = document.getElementById('nights-display');
+      const textSpan = document.getElementById('nights-text');
+
+      if (startVal && endVal) {
+        const start = new Date(startVal);
+        const end = new Date(endVal);
+        const diffTime = end - start;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        if (diffDays > 0) {
+          const nights = diffDays - 1;
+          const text = nights === 0 ? "日帰り" : `${nights}泊${diffDays}日`;
+          textSpan.innerText = text;
+          display.classList.remove('hidden');
+          return { nights, days: diffDays, text };
+        }
+      }
+      display.classList.add('hidden');
+      return { nights: 0, days: 1, text: '1日' };
+    }
+
+    function updateMemberInputs(existingMembers = null) {
+      const count = parseInt(document.getElementById('new-member-count').value);
+      const container = document.getElementById('member-inputs-container');
+      let html = '';
+      for (let i = 1; i <= count; i++) {
+        let name = existingMembers && existingMembers[i - 1] ? existingMembers[i - 1] : (i === 1 ? '自分' : `メンバー${i}`);
+        html += `<input type="text" class="member-name-input w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500" placeholder="名前 ${i}" value="${name}">`;
+      }
+      container.innerHTML = html;
+    }
+
+    function saveTripSettings(isEdit) {
+      const title = document.getElementById('new-title').value.trim() || '無題の旅行';
+      const destination = document.getElementById('new-destination').value.trim() || '未定';
+      const startDate = document.getElementById('new-start-date').value || '';
+      const endDate = document.getElementById('new-end-date').value || '';
+
+      const { days, text } = calculateNights();
+      const daysCount = days > 0 ? days : 1;
+
+      const memberInputs = document.querySelectorAll('.member-name-input');
+      const members = Array.from(memberInputs).map((input, idx) => input.value.trim() || `メンバー${idx + 1}`);
+
+      if (isEdit) {
+        const trip = getCurrentTrip();
+        trip.title = title;
+        trip.destination = destination;
+        trip.startDate = startDate;
+        trip.endDate = endDate;
+        trip.nightsText = text;
+        trip.daysCount = daysCount;
+        trip.members = members;
+
+        while (trip.schedule.length < daysCount) {
+          const nextDay = trip.schedule.length + 1;
+          trip.schedule.push({ day: nextDay, date: `${nextDay}日目`, events: [] });
+        }
+      } else {
+        const schedule = [];
+        for (let i = 1; i <= daysCount; i++) {
+          schedule.push({ day: i, date: `${i}日目`, events: [] });
+        }
+
+        const newTrip = {
+          id: 'trip_' + Date.now(),
+          title,
+          destination,
+          startDate,
+          endDate,
+          nightsText: text,
+          daysCount,
+          currencies: [{ code: 'JPY', rate: 1.0 }],
+          members,
+          activeDay: 1,
+          schedule,
+          belongings: [
+            { id: 1, item: "着替え", checked: false },
+            { id: 2, item: "充電器", checked: false }
+          ],
+          chatHistory: [{ sender: 'ai', text: `「${title}」の計画ですね！テキストを貼り付ければ一括で自動抽出します！` }]
+        };
+        trips.unshift(newTrip);
+        activeTripId = newTrip.id;
+      }
+
+      saveTrips();
+      closeModal();
+      switchTab('home');
+    }
+
+    function selectTrip(id) {
+      activeTripId = id;
+      saveTrips();
+      switchTab('home');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-container').innerHTML = '';
+    }
+
+    function renderHome() {
+      const trip = getCurrentTrip();
+      if (!trip) return renderTrips();
+
+      const memberCount = trip.members ? trip.members.length : 1;
+      const dur = trip.nightsText || `${trip.daysCount}日間`;
+
+      return `
+        <div class="space-y-4">
+          <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-lg">
+            <span class="text-[10px] bg-white/20 backdrop-blur px-2 py-0.5 rounded-full font-semibold">📍 ${trip.destination}</span>
+            <h2 class="text-xl font-bold mt-2">${trip.title}</h2>
+            <p class="text-xs text-blue-100 mt-1">🗓 ${dur} / 👥 ${memberCount}名 (${trip.members ? trip.members.join(', ') : ''})</p>
+            <div class="mt-4 flex gap-2">
+              <button onclick="switchTab('itinerary')" class="bg-white text-blue-700 text-xs px-4 py-2 rounded-xl font-bold shadow-sm">旅程を見よう</button>
+              <button onclick="shareActiveTrip()" class="bg-blue-500/40 border border-white/30 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1">
+                <i data-lucide="share-2" class="w-3.5 h-3.5"></i> 共有URL作成
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function getBookingBadge(status) {
+      if (status === 'reserved') {
+        return `<span class="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded border border-green-300">✅ 予約済み</span>`;
+      } else if (status === 'unreserved') {
+        return `<span class="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded border border-red-300">⚠️ 要予約</span>`;
+      } else {
+        return `<span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">予約不要</span>`;
+      }
+    }
+
+    function renderItinerary() {
+      const trip = getCurrentTrip();
+      if (!trip) return '<div class="text-center text-gray-400 py-8">旅行を選択してください</div>';
+
+      let dayTabsHTML = `<div class="flex space-x-2 mb-4 overflow-x-auto pb-1">`;
+      trip.schedule.forEach(s => {
+        const activeClass = s.day === trip.activeDay ? "bg-blue-600 text-white" : "bg-white text-gray-600 border";
+        dayTabsHTML += `<button onclick="changeDay(${s.day})" class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shadow-sm ${activeClass}">Day ${s.day}</button>`;
+      });
+      dayTabsHTML += `</div>`;
+
+      const currentDay = trip.activeDay;
+      const dayEvents = [];
+
+      trip.schedule.forEach(s => {
+        s.events.forEach(evt => {
+          const type = evt.type || 'spot';
+          if (type === 'hotel') {
+            const startDay = Number(evt.startDay || 1);
+            const endDay = Number(evt.endDay || startDay + 1);
+            if (currentDay >= startDay && currentDay < endDay) {
+              dayEvents.push(evt);
+            }
+          } else {
+            if (s.day === currentDay) {
+              dayEvents.push(evt);
+            }
+          }
+        });
+      });
+
+      dayEvents.sort((a, b) => {
+        const typeA = a.type || 'spot';
+        const typeB = b.type || 'spot';
+        if (typeA === 'hotel' && typeB !== 'hotel') return 1;
+        if (typeA !== 'hotel' && typeB === 'hotel') return -1;
+        return (a.time || '').localeCompare(b.time || '');
+      });
+
+      let eventsHTML = `<div class="space-y-3">`;
+
+      if (dayEvents.length === 0) {
+        eventsHTML += `
+          <div class="text-center py-8 bg-white rounded-xl border border-dashed border-gray-300">
+            <p class="text-gray-400 text-xs">まだ予定が入っていません</p>
+            <button onclick="openEventModal()" class="mt-2 text-xs text-blue-600 font-bold hover:underline">+ 予定を追加する</button>
+          </div>`;
+      } else {
+        dayEvents.forEach(evt => {
+          const type = evt.type || 'spot';
+
+          let expenseBadge = '';
+          if (evt.expense) {
+            const paidStr = evt.paidBy ? `（支払: ${evt.paidBy}）` : '';
+            const targetStr = evt.forMembers && evt.forMembers.length > 0 ? ` 👥対象: ${evt.forMembers.join(', ')}` : '';
+            expenseBadge = `<div class="text-[11px] font-bold text-green-700 bg-green-50 p-1.5 rounded border border-green-200 flex flex-wrap items-center gap-1">
+              <span>💰 ¥${Number(evt.expense).toLocaleString()}</span>
+              <span class="text-green-800">${paidStr}</span>
+              <span class="text-gray-500 text-[10px]">${targetStr}</span>
+            </div>`;
+          }
+
+          if (type === 'hotel') {
+            eventsHTML += `
+              <div onclick="openEventModal('${evt.id}')" class="bg-indigo-50/70 border-2 border-indigo-200 p-4 rounded-xl shadow-sm cursor-pointer hover:border-indigo-400 transition space-y-1.5 mt-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">🏨 宿泊（Day ${evt.startDay}〜Day ${evt.endDay}）</span>
+                  ${getBookingBadge(evt.bookingStatus)}
+                </div>
+                <h3 class="font-bold text-indigo-950 text-base">${evt.title}</h3>
+                ${evt.memo ? `<p class="text-xs text-indigo-900/80 bg-white/80 p-2 rounded">${evt.memo}</p>` : ''}
+                ${expenseBadge ? `<div class="pt-0.5">${expenseBadge}</div>` : ''}
+              </div>`;
+          } else if (type === 'move') {
+            const timeDisplay = evt.endTime ? `${evt.time || ''} 〜 ${evt.endTime}` : (evt.time || '時間未指定');
+            eventsHTML += `
+              <div onclick="openEventModal('${evt.id}')" class="bg-amber-50/60 border border-amber-200 p-4 rounded-xl shadow-sm cursor-pointer hover:border-amber-400 transition space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-bold text-amber-700">🚌 移動 ｜ 🕒 ${timeDisplay}</span>
+                  ${getBookingBadge(evt.bookingStatus)}
+                </div>
+                <div class="flex items-center gap-2 text-base font-bold text-gray-800">
+                  <span>${evt.fromLoc || '出発地'}</span>
+                  <span class="text-amber-500">➔</span>
+                  <span>${evt.toLoc || '到着地'}</span>
+                </div>
+                ${evt.title && evt.title !== '移動' ? `<p class="text-xs text-gray-600">手段/備考: ${evt.title}</p>` : ''}
+                ${evt.memo ? `<p class="text-xs text-gray-500 bg-white p-2 rounded border border-amber-100">${evt.memo}</p>` : ''}
+                ${expenseBadge ? `<div class="pt-0.5">${expenseBadge}</div>` : ''}
+              </div>`;
+          } else {
+            const timeDisplay = evt.endTime ? `${evt.time || '未設定'} 〜 ${evt.endTime}` : (evt.time || '時間未設定');
+            eventsHTML += `
+              <div onclick="openEventModal('${evt.id}')" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition space-y-1.5">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-bold text-blue-600">🕒 ${timeDisplay}</span>
+                  ${getBookingBadge(evt.bookingStatus)}
+                </div>
+                <h3 class="font-bold text-gray-800 text-base">${evt.title}</h3>
+                ${evt.memo ? `<p class="text-xs text-gray-500 bg-gray-50 p-2 rounded">${evt.memo}</p>` : ''}
+                ${expenseBadge ? `<div class="pt-0.5">${expenseBadge}</div>` : ''}
+              </div>`;
+          }
+        });
+
+        eventsHTML += `
+          <button onclick="openEventModal()" class="w-full py-3 bg-blue-50 border border-blue-200 text-blue-600 text-xs font-bold rounded-xl flex items-center justify-center gap-1 shadow-sm mt-2">
+            <i data-lucide="plus" class="w-4 h-4"></i> 新しい予定を入力・追加
+          </button>`;
+      }
+      eventsHTML += `</div>`;
+
+      return dayTabsHTML + eventsHTML;
+    }
+
+    function changeDay(day) {
+      const trip = getCurrentTrip();
+      if (trip) {
+        trip.activeDay = day;
+        saveTrips();
+        switchTab('itinerary');
+      }
+    }
+
+    function openEventModal(eventId = null) {
+      const trip = getCurrentTrip();
+      const allMembers = trip.members || ['自分'];
+      
+      let evt = {
+        id: 'evt_' + Date.now(),
+        type: 'spot',
+        time: '10:00',
+        endTime: '12:00',
+        startDay: trip.activeDay,
+        endDay: Math.min(trip.activeDay + 1, trip.daysCount),
+        fromLoc: '',
+        toLoc: '',
+        title: '',
+        memo: '',
+        bookingStatus: 'unnecessary',
+        expense: '',
+        currency: 'JPY',
+        paidBy: allMembers[0],
+        forMembers: [...allMembers]
+      };
+
+      if (eventId) {
+        let found = null;
+        trip.schedule.forEach(s => {
+          const f = s.events.find(e => e.id === eventId);
+          if (f) found = f;
+        });
+        if (found) {
+          evt = { ...found };
+          if (!evt.type) evt.type = 'spot';
+          if (!evt.forMembers) evt.forMembers = [...allMembers];
+        }
+      }
+
+      const memberPaidOptions = allMembers.map(m => 
+        `<option value="${m}" ${evt.paidBy === m ? 'selected' : ''}>${m}</option>`
+      ).join('');
+
+      const memberForCheckboxes = allMembers.map(m => {
+        const isChecked = evt.forMembers.includes(m);
+        return `
+          <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-gray-50 select-none">
+            <input type="checkbox" name="evt-for-member" value="${m}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded">
+            <span>${m}</span>
+          </label>
+        `;
+      }).join('');
+
+      let dayOptionsStart = '', dayOptionsEnd = '';
+      for (let d = 1; d <= trip.daysCount; d++) {
+        dayOptionsStart += `<option value="${d}" ${Number(evt.startDay) === d ? 'selected' : ''}>Day ${d}</option>`;
+        dayOptionsEnd += `<option value="${d}" ${Number(evt.endDay) === d ? 'selected' : ''}>Day ${d}</option>`;
+      }
+
+      const html = `
+        <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div class="bg-white p-5 rounded-2xl shadow-xl border border-gray-100 w-full max-w-md my-8 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+              <h2 class="text-base font-bold text-gray-800">${eventId ? '予定の編集' : '新しい予定の入力'}</h2>
+              <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">予定の種別</label>
+              <div class="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl">
+                <button type="button" onclick="switchEventType('spot')" id="type-btn-spot" class="py-1.5 text-xs font-bold rounded-lg transition">📍 スポット</button>
+                <button type="button" onclick="switchEventType('hotel')" id="type-btn-hotel" class="py-1.5 text-xs font-bold rounded-lg transition">🏨 宿泊地</button>
+                <button type="button" onclick="switchEventType('move')" id="type-btn-move" class="py-1.5 text-xs font-bold rounded-lg transition">🚌 移動</button>
+              </div>
+            </div>
+
+            <div id="field-spot" class="space-y-3">
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">スポット名 <span class="text-red-500">*</span></label>
+                <input id="evt-title-spot" type="text" value="${evt.type === 'spot' ? evt.title : ''}" placeholder="例：地獄めぐり" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">開始時間</label>
+                  <input id="evt-time" type="time" value="${evt.time || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">終了時間</label>
+                  <input id="evt-end-time" type="time" value="${evt.endTime || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+            </div>
+
+            <div id="field-hotel" class="space-y-3 hidden">
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">ホテル・宿泊施設名 <span class="text-red-500">*</span></label>
+                <input id="evt-title-hotel" type="text" value="${evt.type === 'hotel' ? evt.title : ''}" placeholder="例：杉乃井ホテル" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
+              <div class="grid grid-cols-2 gap-2 bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100">
+                <div>
+                  <label class="block text-[11px] font-bold text-indigo-900 mb-1">チェックイン</label>
+                  <select id="evt-start-day" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                    ${dayOptionsStart}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-indigo-900 mb-1">チェックアウト</label>
+                  <select id="evt-end-day" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                    ${dayOptionsEnd}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div id="field-move" class="space-y-3 hidden">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">出発地 <span class="text-red-500">*</span></label>
+                  <input id="evt-from-loc" type="text" value="${evt.fromLoc || ''}" placeholder="例：羽田" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">到着地 <span class="text-red-500">*</span></label>
+                  <input id="evt-to-loc" type="text" value="${evt.toLoc || ''}" placeholder="例：別府" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">移動手段 / 備考</label>
+                <input id="evt-title-move" type="text" value="${evt.type === 'move' ? evt.title : ''}" placeholder="例：飛行機、レンタカー" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">出発時間</label>
+                  <input id="evt-move-time" type="time" value="${evt.time || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">到着時間</label>
+                  <input id="evt-move-end-time" type="time" value="${evt.endTime || ''}" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">予約の有無</label>
+              <select id="evt-booking" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+                <option value="unnecessary" ${evt.bookingStatus === 'unnecessary' ? 'selected' : ''}>予約不要</option>
+                <option value="reserved" ${evt.bookingStatus === 'reserved' ? 'selected' : ''}>✅ 予約済み</option>
+                <option value="unreserved" ${evt.bookingStatus === 'unreserved' ? 'selected' : ''}>⚠️ 要予約</option>
+              </select>
+            </div>
+
+            <!-- 費用・負担メンバー設定エリア -->
+            <div class="border-t border-b py-3 space-y-3 bg-green-50/40 -mx-5 px-5">
+              <span class="text-xs font-bold text-green-700 block border-b border-green-200/60 pb-1">💰 費用・負担管理</span>
+              <div>
+                <label class="block text-[11px] font-bold text-gray-600 mb-1">金額 (円)</label>
+                <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：70640" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った人</label>
+                <select id="evt-paidBy" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                  ${memberPaidOptions}
+                </select>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-[11px] font-bold text-gray-600">誰の分？（対象メンバー）</label>
+                  <div class="flex gap-2">
+                    <button type="button" onclick="selectAllMembers(true)" class="text-[10px] text-blue-600 font-bold hover:underline">全員</button>
+                    <button type="button" onclick="selectAllMembers(false)" class="text-[10px] text-gray-400 font-bold hover:underline">解除</button>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5" id="for-members-checkbox-group">
+                  ${memberForCheckboxes}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">メモ</label>
+              <textarea id="evt-memo" rows="2" placeholder="予約番号など注意事項" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">${evt.memo}</textarea>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t">
+              ${eventId ? `<button onclick="deleteEvent('${evt.id}')" class="bg-red-50 text-red-600 font-bold px-3 py-2 rounded-lg text-xs hover:bg-red-100">削除</button>` : ''}
+              <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-lg text-xs">キャンセル</button>
+              <button onclick="saveEvent('${evt.id}')" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg text-xs hover:bg-blue-700">保存する</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('modal-container').innerHTML = html;
+      switchEventType(evt.type || 'spot');
+    }
+
+    function selectAllMembers(select) {
+      const checkboxes = document.querySelectorAll('input[name="evt-for-member"]');
+      checkboxes.forEach(cb => cb.checked = select);
+    }
+
+    let currentSelectedType = 'spot';
+    function switchEventType(type) {
+      currentSelectedType = type;
+      const spotBtn = document.getElementById('type-btn-spot');
+      const hotelBtn = document.getElementById('type-btn-hotel');
+      const moveBtn = document.getElementById('type-btn-move');
+
+      const spotField = document.getElementById('field-spot');
+      const hotelField = document.getElementById('field-hotel');
+      const moveField = document.getElementById('field-move');
+
+      [spotBtn, hotelBtn, moveBtn].forEach(btn => btn.className = "py-1.5 text-xs font-bold rounded-lg transition text-gray-500");
+      [spotField, hotelField, moveField].forEach(f => f.classList.add('hidden'));
+
+      if (type === 'hotel') {
+        hotelBtn.className = "py-1.5 text-xs font-bold rounded-lg transition bg-white text-indigo-700 shadow-sm";
+        hotelField.classList.remove('hidden');
+      } else if (type === 'move') {
+        moveBtn.className = "py-1.5 text-xs font-bold rounded-lg transition bg-white text-amber-700 shadow-sm";
+        moveField.classList.remove('hidden');
+      } else {
+        spotBtn.className = "py-1.5 text-xs font-bold rounded-lg transition bg-white text-blue-600 shadow-sm";
+        spotField.classList.remove('hidden');
+      }
+    }
+
+    function saveEvent(eventId) {
+      const type = currentSelectedType;
+      let title = '';
+      let time = '', endTime = '';
+      let startDay = 1, endDay = 2;
+      let fromLoc = '', toLoc = '';
+
+      if (type === 'hotel') {
+        title = document.getElementById('evt-title-hotel').value.trim();
+        startDay = Number(document.getElementById('evt-start-day').value);
+        endDay = Number(document.getElementById('evt-end-day').value);
+        if (!title) { alert('ホテル・宿泊施設名を入力してください！'); return; }
+      } else if (type === 'move') {
+        fromLoc = document.getElementById('evt-from-loc').value.trim();
+        toLoc = document.getElementById('evt-to-loc').value.trim();
+        title = document.getElementById('evt-title-move').value.trim();
+        time = document.getElementById('evt-move-time').value;
+        endTime = document.getElementById('evt-move-end-time').value;
+        if (!fromLoc || !toLoc) { alert('出発地と到着地の両方を入力してください！'); return; }
+      } else {
+        title = document.getElementById('evt-title-spot').value.trim();
+        time = document.getElementById('evt-time').value;
+        endTime = document.getElementById('evt-end-time').value;
+        if (!title) { alert('スポット名を入力してください！'); return; }
+      }
+
+      const trip = getCurrentTrip();
+      const currentSchedule = trip.schedule.find(s => s.day === trip.activeDay);
+      
+      trip.schedule.forEach(s => {
+        s.events = s.events.filter(e => e.id !== eventId);
+      });
+
+      const checkedForMembers = Array.from(document.querySelectorAll('input[name="evt-for-member"]:checked')).map(cb => cb.value);
+
+      const eventData = {
+        id: eventId,
+        type,
+        title,
+        time,
+        endTime,
+        startDay,
+        endDay,
+        fromLoc,
+        toLoc,
+        bookingStatus: document.getElementById('evt-booking').value,
+        expense: document.getElementById('evt-expense').value,
+        currency: 'JPY',
+        paidBy: document.getElementById('evt-paidBy').value,
+        forMembers: checkedForMembers.length > 0 ? checkedForMembers : (trip.members ? [...trip.members] : ['自分']),
+        memo: document.getElementById('evt-memo').value.trim()
+      };
+
+      currentSchedule.events.push(eventData);
+
+      saveTrips();
+      closeModal();
+      switchTab('itinerary');
+    }
+
+    function deleteEvent(eventId) {
+      if (!confirm('この予定を削除してもよろしいですか？')) return;
+      const trip = getCurrentTrip();
+      trip.schedule.forEach(s => {
+        s.events.forEach(e => {
+          s.events = s.events.filter(item => item.id !== eventId);
+        });
+      });
+
+      saveTrips();
+      closeModal();
+      switchTab('itinerary');
+    }
+
+    // --- 精算ロジック＆タップ展開明細機能 ---
+    function toggleMemberItems(index) {
+      const el = document.getElementById(`member-details-${index}`);
+      const arrow = document.getElementById(`member-arrow-${index}`);
+      if (el) {
+        el.classList.toggle('hidden');
+        if (arrow) {
+          arrow.classList.toggle('rotate-180');
+        }
+      }
+    }
+
+    function renderSettlement() {
+      const trip = getCurrentTrip();
+      if (!trip) return '';
+
+      const members = trip.members || ['自分'];
+      let grandTotalYen = 0;
+
+      const paidMap = {};
+      const shareMap = {};
+      const paidItemsMap = {}; // 誰が何を払ったかの明細リスト
+
+      members.forEach(m => { 
+        paidMap[m] = 0; 
+        shareMap[m] = 0; 
+        paidItemsMap[m] = [];
+      });
+
+      trip.schedule.forEach(s => {
+        s.events.forEach(e => {
+          if (e.expense) {
+            const exp = Number(e.expense);
+            grandTotalYen += exp;
+
+            const payer = e.paidBy || members[0];
+            if (paidMap[payer] !== undefined) {
+              paidMap[payer] += exp;
+              paidItemsMap[payer].push({
+                title: e.title || `${e.fromLoc || ''} ➔ ${e.toLoc || ''}`,
+                expense: exp,
+                forMembers: e.forMembers || members,
+                day: s.day
+              });
+            }
+
+            const targets = (e.forMembers && e.forMembers.length > 0) ? e.forMembers : members;
+            const splitAmount = exp / targets.length;
+            targets.forEach(t => {
+              if (shareMap[t] !== undefined) shareMap[t] += splitAmount;
+            });
+          }
+        });
+      });
+
+      const balances = members.map(m => {
+        return { 
+          name: m, 
+          balance: paidMap[m] - shareMap[m], 
+          paid: paidMap[m], 
+          share: shareMap[m],
+          items: paidItemsMap[m]
+        };
+      });
+
+      let debtors = balances.filter(b => b.balance < -1).map(b => ({ ...b, balance: -b.balance }));
+      let creditors = balances.filter(b => b.balance > 1).map(b => ({ ...b }));
+
+      const transfers = [];
+      let dIdx = 0, cIdx = 0;
+
+      while (dIdx < debtors.length && cIdx < creditors.length) {
+        const debt = debtors[dIdx];
+        const cred = creditors[cIdx];
+        const amount = Math.min(debt.balance, cred.balance);
+
+        if (amount > 0) {
+          transfers.push({ from: debt.name, to: cred.name, amount: Math.round(amount) });
+        }
+
+        debt.balance -= amount;
+        cred.balance -= amount;
+
+        if (debt.balance <= 1) dIdx++;
+        if (cred.balance <= 1) cIdx++;
+      }
+
+      // タップで開閉できるメンバー別収支リスト
+      const balanceListHTML = balances.map((b, idx) => {
+        const itemsHTML = b.items.length > 0 ? b.items.map(item => `
+          <div class="flex justify-between items-center py-1.5 px-2 bg-gray-50 rounded text-[11px] text-gray-600">
+            <div>
+              <span class="font-bold text-gray-700">[Day ${item.day}] ${item.title}</span>
+              <span class="text-[10px] text-gray-400 block">対象: ${item.forMembers.join(', ')}</span>
+            </div>
+            <span class="font-bold text-gray-800">¥${item.expense.toLocaleString()}</span>
+          </div>
+        `).join('') : '<div class="text-[11px] text-gray-400 py-1 italic">支払った記録はありません</div>';
+
+        return `
+          <div class="border-b border-gray-100 last:border-none">
+            <div onclick="toggleMemberItems(${idx})" class="flex justify-between items-center py-2.5 cursor-pointer hover:bg-gray-50/80 px-1 rounded transition select-none">
+              <div>
+                <div class="flex items-center gap-1">
+                  <span class="font-bold text-gray-800 text-xs">${b.name}</span>
+                  <i data-lucide="chevron-down" id="member-arrow-${idx}" class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200"></i>
+                </div>
+                <div class="text-[10px] text-gray-400 mt-0.5">支払済: ¥${Math.round(b.paid).toLocaleString()} ｜ 負担額: ¥${Math.round(b.share).toLocaleString()}</div>
+              </div>
+              <div class="text-right">
+                <span class="font-bold text-xs ${b.balance >= 0 ? 'text-green-600' : 'text-red-500'}">
+                  ${b.balance >= 0 ? '+' : ''}¥${Math.round(b.balance).toLocaleString()}
+                </span>
+                <span class="text-[9px] text-gray-400 block">${b.items.length}件の支払</span>
+              </div>
+            </div>
+            <div id="member-details-${idx}" class="hidden pl-2 pr-1 pb-2.5 space-y-1">
+              <div class="text-[10px] font-bold text-gray-500 mb-1 border-l-2 border-blue-400 pl-1.5">${b.name} が支払った内訳一覧</div>
+              ${itemsHTML}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const transferListHTML = transfers.length > 0 ? transfers.map(t => `
+        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex justify-between items-center text-xs mb-2">
+          <div class="font-bold text-amber-900">
+            <span>${t.from}</span> <span class="text-amber-500">➔</span> <span>${t.to}</span>
+          </div>
+          <span class="font-extrabold text-amber-700 text-sm">¥${t.amount.toLocaleString()}</span>
+        </div>
+      `).join('') : '<p class="text-xs text-gray-400 text-center py-2">精算の必要はありません</p>';
+
+      return `
+        <div class="space-y-4">
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow">
+            <p class="text-xs text-blue-100">旅程に登録された総費用</p>
+            <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round(grandTotalYen).toLocaleString()}</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-1">
+              <h3 class="text-xs font-bold text-gray-700">🤝 メンバー別収支状況</h3>
+              <span class="text-[10px] text-blue-600">タップで支払明細を表示</span>
+            </div>
+            ${balanceListHTML}
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-xs font-bold text-gray-700 mb-3">💡 最終精算ルート（清算一覧）</h3>
+            ${transferListHTML}
+          </div>
+        </div>`;
+    }
+
+    // --- AI相談・チャット多行解析機能 ---
+    function renderAI() {
+      const trip = getCurrentTrip();
+      if (!trip) return '';
+
+      if (!trip.chatHistory) {
+        trip.chatHistory = [{ sender: 'ai', text: 'LINEやメモの旅程（例:「13:15〜14:15 ランチ」「羽田 → 別府」など複数行も可）を貼り付けてみてください！自動解析します。' }];
+      }
+
+      let chatLogs = trip.chatHistory.map((msg, index) => {
+        if (msg.sender === 'user') {
+          return `<div class="flex justify-end mb-3"><div class="bg-blue-600 text-white p-3 rounded-2xl rounded-tr-none text-xs max-w-[80%] whitespace-pre-wrap">${msg.text}</div></div>`;
+        } else {
+          let parsedCards = '';
+          if (msg.parsedEvents && msg.parsedEvents.length > 0) {
+            parsedCards = msg.parsedEvents.map((pe, peIdx) => `
+              <div class="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1 text-xs">
+                <div class="flex justify-between items-center font-bold text-blue-900 border-b border-blue-200 pb-1">
+                  <span>✨ 抽出結果 (Day ${pe.day})</span>
+                  <span class="bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded text-[10px]">${pe.type === 'hotel' ? '🏨 宿泊' : (pe.type === 'move' ? '🚌 移動' : '📍 スポット')}</span>
+                </div>
+                <div><b>内容:</b> ${pe.title || (pe.fromLoc + ' ➔ ' + pe.toLoc)}</div>
+                ${pe.time ? `<div><b>時間:</b> ${pe.time} ${pe.endTime ? '〜 ' + pe.endTime : ''}</div>` : ''}
+                <button onclick="applyParsedEvent(${index}, ${peIdx})" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow-sm">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> 旅程にこの予定を追加
+                </button>
+              </div>
+            `).join('');
+
+            if (msg.parsedEvents.length > 1) {
+              parsedCards += `
+                <button onclick="applyAllParsedEvents(${index})" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1 shadow">
+                  <i data-lucide="check-circle" class="w-4 h-4"></i> 上記 ${msg.parsedEvents.length} 件の予定を一括追加する
+                </button>
+              `;
+            }
+          }
+
+          return `
+            <div class="flex justify-start mb-3 gap-2">
+              <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold shrink-0">AI</div>
+              <div class="bg-white border p-3 rounded-2xl rounded-tl-none text-xs max-w-[85%] shadow-sm text-gray-800 whitespace-pre-wrap">${msg.text}${parsedCards}</div>
+            </div>`;
+        }
+      }).join('');
+
+      return `
+        <div class="flex flex-col h-[calc(100vh-140px)]">
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-2.5 mb-3 flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-blue-600 shrink-0"></i>
+            <p class="text-[11px] text-blue-800 leading-tight">複数行のスケジュール文章もまとめて自動解析できます！</p>
+          </div>
+
+          <div class="flex-1 overflow-y-auto pr-1" id="chat-box">
+            ${chatLogs}
+          </div>
+          <div class="mt-2 flex flex-col gap-2">
+            <textarea id="ai-input" rows="3" placeholder="ここに旅行のスケジュールテキストを貼り付けてください" class="w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-blue-500"></textarea>
+            <button onclick="sendAIMessage()" class="w-full bg-blue-600 text-white py-2 rounded-xl text-xs font-bold shadow">解析して予定を抽出する</button>
           </div>
         </div>
       `;
     }
 
-    function addItineraryItem() {
-      const time = document.getElementById('add-time').value || "00:00";
-      const title = document.getElementById('add-title').value.trim();
-      const memo = document.getElementById('add-memo').value.trim();
-
-      if (!title) return alert("予定名を入力してください");
+    function sendAIMessage() {
+      const input = document.getElementById('ai-input');
+      const val = input.value.trim();
+      if (!val) return;
 
       const trip = getCurrentTrip();
-      trip.itinerary.push({ day: 1, time, title, memo });
-      trip.itinerary.sort((a, b) => a.time.localeCompare(b.time));
+      if (!trip.chatHistory) trip.chatHistory = [];
+
+      trip.chatHistory.push({ sender: 'user', text: val });
+      
+      setTimeout(() => {
+        const events = parseTextToEvents(val, trip);
+        let replyText = "";
+        
+        if (events.length > 0) {
+          replyText = `テキストから ${events.length} 件の予定情報を正確に検出しました！\n確認して「旅程に追加」ボタンを押してください。`;
+        } else {
+          replyText = "テキストをパースできませんでした。時間やスポット名が含まれているかご確認ください。";
+        }
+
+        trip.chatHistory.push({ 
+          sender: 'ai', 
+          text: replyText,
+          parsedEvents: events.length > 0 ? events : null
+        });
+        saveTrips();
+        switchTab('ai');
+      }, 300);
 
       saveTrips();
+      switchTab('ai');
+    }
+
+    function parseTextToEvents(fullText, trip) {
+      const lines = fullText.split('\n');
+      const results = [];
+      let currentDay = trip.activeDay || 1;
+
+      lines.forEach(line => {
+        const text = line.trim();
+        if (!text) return;
+
+        const dayMatch = text.match(/(?:🗓️)?\s*(\d+)\s*日目/i) || text.match(/Day\s*(\d+)/i);
+        if (dayMatch) {
+          currentDay = Math.min(parseInt(dayMatch[1]), trip.daysCount);
+        }
+
+        let time = '', endTime = '';
+        const rangeMatch = text.match(/(\d{1,2}:\d{2})\s*(?:〜|~|-|ー)\s*(\d{1,2}:\d{2})/);
+        if (rangeMatch) {
+          time = rangeMatch[1];
+          endTime = rangeMatch[2];
+        } else {
+          const singleMatch = text.match(/(\d{1,2}:\d{2})/);
+          if (singleMatch) time = singleMatch[1];
+        }
+
+        let type = 'spot';
+        let fromLoc = '', toLoc = '';
+        const arrowSplit = text.split(/→|➔|->/);
+
+        if (arrowSplit.length >= 2) {
+          type = 'move';
+          fromLoc = arrowSplit[0].replace(/.*?(?:\d+日目|[\d:]+|\s)+/, '').trim();
+          toLoc = arrowSplit[1].replace(/泊|着|発|🚗|✈️/g, '').trim();
+        } else if (/ホテル|宿|チェックイン|宿泊|旅館/i.test(text)) {
+          type = 'hotel';
+        } else if (/発|着|レンタカー|ドライブ/i.test(text)) {
+          type = 'move';
+        }
+
+        let title = text
+          .replace(/(?:🗓️)?\s*\d+\s*日目.*$/g, '')
+          .replace(/\d{1,2}:\d{2}(?:\s*(?:〜|~|-|ー)\s*\d{1,2}:\d{2})?/, '')
+          .replace(/✈️|🚗|♨️|📍|🏨|🚌/g, '')
+          .replace(/発|着|手続き/g, '')
+          .trim();
+
+        if (type === 'move' && !fromLoc) {
+          fromLoc = title || "出発地";
+          toLoc = "目的地";
+        }
+
+        if (time || title || fromLoc) {
+          results.push({
+            id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            type,
+            day: currentDay,
+            title: title || (type === 'hotel' ? '宿泊地' : 'スポット'),
+            time,
+            endTime,
+            startDay: currentDay,
+            endDay: Math.min(currentDay + 1, trip.daysCount),
+            fromLoc,
+            toLoc,
+            bookingStatus: 'unnecessary',
+            expense: '',
+            currency: 'JPY',
+            paidBy: trip.members ? trip.members[0] : '自分',
+            forMembers: trip.members ? [...trip.members] : ['自分'],
+            memo: ''
+          });
+        }
+      });
+
+      return results;
+    }
+
+    function applyParsedEvent(historyIndex, eventIndex) {
+      const trip = getCurrentTrip();
+      const msg = trip.chatHistory[historyIndex];
+      if (!msg || !msg.parsedEvents) return;
+
+      const pe = msg.parsedEvents[eventIndex];
+      const targetSchedule = trip.schedule.find(s => s.day === pe.day) || trip.schedule[0];
+
+      targetSchedule.events.push({ ...pe });
+      trip.activeDay = pe.day;
+
+      msg.parsedEvents.splice(eventIndex, 1);
+      saveTrips();
+
+      alert(`「${pe.title || pe.fromLoc}」を追加しました！`);
       switchTab('itinerary');
     }
 
-    function deleteItinerary(index) {
+    function applyAllParsedEvents(historyIndex) {
       const trip = getCurrentTrip();
-      trip.itinerary.splice(index, 1);
+      const msg = trip.chatHistory[historyIndex];
+      if (!msg || !msg.parsedEvents) return;
+
+      msg.parsedEvents.forEach(pe => {
+        const targetSchedule = trip.schedule.find(s => s.day === pe.day) || trip.schedule[0];
+        targetSchedule.events.push({ ...pe });
+      });
+
+      const count = msg.parsedEvents.length;
+      msg.parsedEvents = [];
       saveTrips();
+
+      alert(`${count} 件の予定を一括追加しました！`);
       switchTab('itinerary');
     }
 
-    // --- 5. 持ち物画面 ---
     function renderBelongings() {
       const trip = getCurrentTrip();
       if (!trip) return '';
 
       return `
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <div class="flex justify-between items-center mb-3">
-            <h2 class="text-sm font-bold text-gray-700">持ち物チェックリスト</h2>
-          </div>
+          <h2 class="text-sm font-bold text-gray-700 mb-3">持ち物チェックリスト</h2>
           <div class="space-y-2">
             ${trip.belongings.map(b => `
               <label class="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded border-b border-gray-50 last:border-none">
@@ -317,16 +1192,11 @@
                   <input type="checkbox" ${b.checked ? 'checked' : ''} onchange="toggleBelonging(${b.id})" class="w-4 h-4 text-blue-600 rounded">
                   <span class="${b.checked ? 'line-through text-gray-400' : 'text-gray-700'}">${b.item}</span>
                 </div>
-                <button onclick="deleteBelonging(${b.id})" class="text-gray-300 hover:text-red-500 text-xs px-1">✕</button>
               </label>
             `).join('')}
           </div>
-          <div class="flex gap-2 mt-4 pt-3 border-t">
-            <input id="new-item-input" type="text" placeholder="新しい持ち物を追加" class="flex-1 border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500">
-            <button onclick="addBelonging()" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">追加</button>
-          </div>
-        </div>
-      `;
+          <button onclick="addBelongingPrompt()" class="mt-3 w-full py-2 text-xs text-blue-600 font-bold bg-blue-50 rounded-lg hover:bg-blue-100">+ 持ち物を追加</button>
+        </div>`;
     }
 
     function toggleBelonging(id) {
@@ -339,242 +1209,44 @@
       }
     }
 
-    function addBelonging() {
-      const input = document.getElementById('new-item-input');
-      const text = input.value.trim();
-      if (!text) return;
+    function addBelongingPrompt() {
+      const item = prompt("追加する持ち物名");
+      if (!item) return;
       const trip = getCurrentTrip();
-      trip.belongings.push({ id: Date.now(), item: text, checked: false });
+      trip.belongings.push({ id: Date.now(), item, checked: false });
       saveTrips();
       switchTab('belongings');
     }
 
-    function deleteBelonging(id) {
-      const trip = getCurrentTrip();
-      trip.belongings = trip.belongings.filter(b => b.id !== id);
-      saveTrips();
-      switchTab('belongings');
-    }
-
-    // --- 6. 割り勘画面 ---
-    function renderSettlement() {
-      const trip = getCurrentTrip();
-      if (!trip) return '';
-
-      const totalAmount = trip.expenses.reduce((sum, e) => sum + e.amount, 0);
-      const memberCount = trip.members.length || 1;
-      const perPerson = Math.ceil(totalAmount / memberCount);
-
-      return `
-        <div class="space-y-4">
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h2 class="text-xs font-bold text-gray-500">清算サマリー</h2>
-            <div class="flex justify-between items-baseline mt-2">
-              <span class="text-xs text-gray-600">合計支出:</span>
-              <span class="text-lg font-extrabold text-gray-800">¥${totalAmount.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between items-baseline mt-1 border-t border-gray-100 pt-2">
-              <span class="text-xs font-bold text-blue-600">1人あたり:</span>
-              <span class="text-xl font-black text-blue-600">¥${perPerson.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-            <h3 class="text-xs font-bold text-gray-700 mb-3">支出リスト</h3>
-            <div class="space-y-2">
-              ${trip.expenses.map(e => `
-                <div class="flex justify-between items-center text-xs p-2 bg-gray-50 rounded">
-                  <div>
-                    <div class="font-bold text-gray-800">${e.title}</div>
-                    <div class="text-gray-400">立替: ${e.payer}</div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="font-bold text-gray-700">¥${e.amount.toLocaleString()}</span>
-                    <button onclick="deleteExpense(${e.id})" class="text-gray-300 hover:text-red-500">✕</button>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="bg-white p-3 rounded-xl border border-dashed border-gray-300 space-y-2">
-            <div class="text-xs font-bold text-gray-600">支出の追加</div>
-            <input id="exp-title" type="text" placeholder="品目（例: タクシー代）" class="w-full border rounded-lg p-1.5 text-xs">
-            <div class="grid grid-cols-2 gap-2">
-              <input id="exp-amount" type="number" placeholder="金額 (円)" class="border rounded-lg p-1.5 text-xs">
-              <select id="exp-payer" class="border rounded-lg p-1.5 text-xs">
-                ${trip.members.map(m => `<option value="${m}">${m}</option>`).join('')}
-              </select>
-            </div>
-            <button onclick="addExpense()" class="w-full bg-blue-600 text-white text-xs py-2 rounded-lg font-bold">追加する</button>
-          </div>
-        </div>
-      `;
-    }
-
-    function addExpense() {
-      const title = document.getElementById('exp-title').value.trim();
-      const amount = parseInt(document.getElementById('exp-amount').value);
-      const payer = document.getElementById('exp-payer').value;
-
-      if (!title || isNaN(amount)) return alert("正確な情報を入力してください");
-
-      const trip = getCurrentTrip();
-      trip.expenses.push({ id: Date.now(), title, amount, payer });
-      saveTrips();
-      switchTab('settlement');
-    }
-
-    function deleteExpense(id) {
-      const trip = getCurrentTrip();
-      trip.expenses = trip.expenses.filter(e => e.id !== id);
-      saveTrips();
-      switchTab('settlement');
-    }
-
-    // --- 7. AI / チャット自動読み取り画面 ---
-    function renderAI() {
-      return `
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
-          <div class="flex items-center gap-2 text-indigo-600">
-            <i data-lucide="sparkles" class="w-5 h-5"></i>
-            <h2 class="text-sm font-bold">チャット解析（日程追加）</h2>
-          </div>
-          <p class="text-xs text-gray-500 leading-relaxed">
-            LINEなどの会話テキストを貼り付けると、AI風に時間と予定を自動抽出してスケジュールに追加します。
-          </p>
-
-          <textarea id="chat-input" class="w-full border border-gray-200 rounded-lg p-2.5 text-xs h-32 focus:outline-none focus:border-indigo-500" placeholder="【貼り付け例】
-10:00に東京駅集合ね！
-12時半から浅草でランチ食べて
-15:00にホテルチェックインしよう"></textarea>
-
-          <button onclick="parseChatText()" class="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-xs py-2.5 rounded-lg font-bold shadow-md hover:opacity-90 transition">
-            テキストを解析して日程に追加
-          </button>
-        </div>
-      `;
-    }
-
-    function parseChatText() {
-      const text = document.getElementById('chat-input').value;
-      if (!text.trim()) return alert("テキストを入力してください");
-
-      // 簡易的な正規表現パターン（例: "10:00", "10時", "10時半" など）
-      const lines = text.split('\n');
-      const trip = getCurrentTrip();
-      let addedCount = 0;
-
-      lines.forEach(line => {
-        const timeMatch = line.match(/(\d{1,2})[:：](\d{2})|(\d{1,2})時(半|(\d{2})分)?/);
-        if (timeMatch) {
-          let hours = 0;
-          let minutes = "00";
-
-          if (timeMatch[1] !== undefined) {
-            hours = timeMatch[1].padStart(2, '0');
-            minutes = timeMatch[2];
-          } else if (timeMatch[3] !== undefined) {
-            hours = timeMatch[3].padStart(2, '0');
-            if (timeMatch[4] === '半') {
-              minutes = "30";
-            } else if (timeMatch[5]) {
-              minutes = timeMatch[5].padStart(2, '0');
-            }
-          }
-
-          const timeStr = `${hours}:${minutes}`;
-          const titleStr = line.replace(timeMatch[0], '').replace(/[ねよ！!〜〜]/g, '').trim();
-
-          if (titleStr) {
-            trip.itinerary.push({
-              day: 1,
-              time: timeStr,
-              title: titleStr,
-              memo: "チャットから自動作成"
-            });
-            addedCount++;
-          }
-        }
-      });
-
-      if (addedCount > 0) {
-        trip.itinerary.sort((a, b) => a.time.localeCompare(b.time));
-        saveTrips();
-        alert(`${addedCount} 件の予定を抽出して日程表に追加しました！`);
-        switchTab('itinerary');
-      } else {
-        alert("時間と予定のパターンが見つかりませんでした。「10:00 集合」のように時間を含めて入力してください。");
-      }
-    }
-
-    // --- 8. URL共有パース処理 ---
-    function checkSharedURL() {
-      const params = new URLSearchParams(window.location.search);
-      const dataStr = params.get('data');
-      if (dataStr) {
-        try {
-          const sharedTrip = JSON.parse(decodeURIComponent(dataStr));
-          const exists = trips.find(t => t.id === sharedTrip.id);
-          if (!exists) {
-            trips.push(sharedTrip);
-            currentTripId = sharedTrip.id;
-            saveTrips();
-            alert(`共有された旅行「${sharedTrip.title}」を追加しました！`);
-          } else {
-            currentTripId = sharedTrip.id;
-          }
-        } catch (e) {
-          console.error("共有データの読み込みに失敗しました", e);
-        }
-      }
-    }
-
-    // --- 9. タブ切り替え ＆ 初期化 ---
-    let currentTab = 'home';
+    const views = {
+      home: renderHome,
+      itinerary: renderItinerary,
+      belongings: renderBelongings,
+      settlement: renderSettlement,
+      ai: renderAI,
+      trips: renderTrips
+    };
 
     function switchTab(tabName) {
-      currentTab = tabName;
       updateHeader();
-
-      const tabs = ['home', 'itinerary', 'belongings', 'settlement', 'ai'];
-      tabs.forEach(t => {
-        const btn = document.getElementById(`tab-${t}`);
-        if (btn) {
-          if (t === tabName) {
-            btn.className = "tab-btn flex flex-col items-center text-blue-600 font-bold";
-          } else {
-            btn.className = "tab-btn flex flex-col items-center text-gray-400";
-          }
-        }
+      document.getElementById('app-content').innerHTML = views[tabName]();
+      
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-blue-600');
+        btn.classList.add('text-gray-400');
       });
 
-      const contentEl = document.getElementById('app-content');
-      if (tabName === 'trips') {
-        contentEl.innerHTML = renderTrips();
-      } else if (tabName === 'home') {
-        contentEl.innerHTML = renderHome();
-      } else if (tabName === 'itinerary') {
-        contentEl.innerHTML = renderItinerary();
-      } else if (tabName === 'belongings') {
-        contentEl.innerHTML = renderBelongings();
-      } else if (tabName === 'settlement') {
-        contentEl.innerHTML = renderSettlement();
-      } else if (tabName === 'ai') {
-        contentEl.innerHTML = renderAI();
+      const activeTabBtn = document.getElementById(`tab-${tabName}`);
+      if (activeTabBtn) {
+        activeTabBtn.classList.remove('text-gray-400');
+        activeTabBtn.classList.add('text-blue-600');
       }
 
-      // Lucide アイコンの再描画
-      if (window.lucide) {
-        lucide.createIcons();
-      }
+      lucide.createIcons();
     }
 
-    // 初期起動
-    window.onload = function() {
-      checkSharedURL();
-      switchTab('home');
-    };
+    checkSharedURL();
+    switchTab('home');
   </script>
 </body>
 </html>
