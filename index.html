@@ -6,27 +6,6 @@
   <title>Tabiori 風 旅行しおりアプリ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Firebase SDK (ES Module) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-    // Firebase 初期設定（共有デモ用DB）
-    const firebaseConfig = {
-      databaseURL: "https://tabiori-realtime-default-rtdb.firebaseio.com"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    window.firebaseDB = db;
-    window.dbRef = ref;
-    window.dbOnValue = onValue;
-    window.dbSet = set;
-
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans pb-24">
 
@@ -129,7 +108,6 @@
     let trips = JSON.parse(localStorage.getItem('my_trips')) || defaultTrips;
     let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
     let openAccordions = {};
-    let isRemoteUpdate = false; // ループ制御用フラグ
 
     // 移行用：古いデータ形式（currencyCode/currencyRate）があればcurrencies配列に変換
     trips.forEach(t => {
@@ -143,51 +121,27 @@
       }
     });
 
-    // リアルタイム同期の受信設定
-    window.addEventListener('firebase-ready', () => {
-      checkSharedURL();
-      setupRealtimeSync();
-    });
-
-    function setupRealtimeSync() {
-      if (!window.firebaseDB || !activeTripId) return;
-      const tripRef = window.dbRef(window.firebaseDB, 'trips/' + activeTripId);
-
-      window.dbOnValue(tripRef, (snapshot) => {
-        const remoteTrip = snapshot.val();
-        if (remoteTrip) {
-          isRemoteUpdate = true;
-          const idx = trips.findIndex(t => t.id === remoteTrip.id);
-          if (idx !== -1) {
-            trips[idx] = remoteTrip;
-          } else {
-            trips.unshift(remoteTrip);
-          }
-          localStorage.setItem('my_trips', JSON.stringify(trips));
-          
-          // ヘッダーや画面表示の最新化
-          updateHeader();
-          const activeTabBtn = document.querySelector('.tab-btn.text-blue-600');
-          if (activeTabBtn && typeof switchTab === 'function') {
-            const currentTab = activeTabBtn.id.replace('tab-', '');
-            switchTab(currentTab);
-          }
-          isRemoteUpdate = false;
-        }
-      });
-    }
-
     function checkSharedURL() {
       if (window.location.hash.startsWith('#trip=')) {
         try {
-          const tripId = window.location.hash.replace('#trip=', '');
-          if (tripId) {
-            activeTripId = tripId;
-            localStorage.setItem('active_trip_id', activeTripId);
+          const encodedData = window.location.hash.replace('#trip=', '');
+          const jsonStr = decodeURIComponent(atob(encodedData));
+          const importedTrip = JSON.parse(jsonStr);
+
+          if (importedTrip && importedTrip.id && importedTrip.title) {
+            const existingIdx = trips.findIndex(t => t.id === importedTrip.id);
+            if (existingIdx !== -1) {
+              trips[existingIdx] = importedTrip;
+            } else {
+              trips.unshift(importedTrip);
+            }
+            activeTripId = importedTrip.id;
+            saveTrips();
+            alert(`「${importedTrip.title}」の旅行データを共有URLから読み込みました！`);
             history.replaceState(null, '', window.location.pathname);
           }
         } catch (e) {
-          console.error("共有URLのパースに失敗しました", e);
+          console.error("共有データのパースに失敗しました", e);
         }
       }
     }
@@ -197,32 +151,25 @@
       if (!trip) return;
 
       try {
-        const shareURL = `${window.location.origin}${window.location.pathname}#trip=${trip.id}`;
+        const jsonStr = JSON.stringify(trip);
+        const encodedData = btoa(encodeURIComponent(jsonStr));
+        const shareURL = `${window.location.origin}${window.location.pathname}#trip=${encodedData}`;
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(shareURL).then(() => {
-            alert(`「${trip.title}」のリアルタイム共有URLをクリップボードにコピーしました！`);
+            alert(`「${trip.title}」の編集用共有URLをクリップボードにコピーしました！`);
           });
         } else {
           prompt("以下のURLをコピーして友達に共有してください：", shareURL);
         }
       } catch (e) {
-        alert("共有URLの作成に失敗しました。");
+        alert("データの容量が大きすぎるため共有URLを作成できませんでした。");
       }
     }
 
     function saveTrips() {
       localStorage.setItem('my_trips', JSON.stringify(trips));
       localStorage.setItem('active_trip_id', activeTripId);
-
-      // 自分の変更時のみFirebaseへ書き込み
-      if (!isRemoteUpdate && window.firebaseDB && activeTripId) {
-        const trip = getCurrentTrip();
-        if (trip) {
-          const tripRef = window.dbRef(window.firebaseDB, 'trips/' + activeTripId);
-          window.dbSet(tripRef, trip);
-        }
-      }
     }
 
     function getCurrentTrip() {
@@ -276,12 +223,6 @@
       `;
     }
 
-    function selectTrip(id) {
-      activeTripId = id;
-      saveTrips();
-      setupRealtimeSync();
-    }
-
     function showCreateTripModal(isEdit = false) {
       const trip = isEdit ? getCurrentTrip() : null;
       const titleVal = trip ? trip.title : '';
@@ -300,9 +241,5 @@
               <label class="block text-xs font-bold text-gray-600 mb-1">旅行タイトル</label>
               <input id="new-title" type="text" value="${titleVal}" placeholder="例：ヨーロッパ周遊旅行" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
             </div>
-      `;
-      document.getElementById('modal-container').innerHTML = html;
-    }
-  </script>
-</body>
-</html>
+
+     
