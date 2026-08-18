@@ -92,7 +92,6 @@
 
     let trips = JSON.parse(localStorage.getItem('my_trips')) || defaultTrips;
     let activeTripId = localStorage.getItem('active_trip_id') || trips[0]?.id;
-    let openMemberDetails = {};
 
     function checkSharedURL() {
       if (window.location.hash.startsWith('#trip=')) {
@@ -450,7 +449,14 @@
 
           let expenseBadge = '';
           if (evt.expense) {
-            expenseBadge = `<span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">💰 ¥${Number(evt.expense).toLocaleString()}</span>`;
+            const forCount = evt.forMembers ? evt.forMembers.length : (trip.members ? trip.members.length : 1);
+            const paidStr = evt.paidBy ? `（支払: ${evt.paidBy}）` : '';
+            const targetStr = evt.forMembers && evt.forMembers.length > 0 ? ` 👥対象: ${evt.forMembers.join(', ')}` : '';
+            expenseBadge = `<div class="text-[11px] font-bold text-green-700 bg-green-50 p-1.5 rounded border border-green-200 flex flex-wrap items-center gap-1">
+              <span>💰 ¥${Number(evt.expense).toLocaleString()}</span>
+              <span class="text-green-800">${paidStr}</span>
+              <span class="text-gray-500 text-[10px]">${targetStr}</span>
+            </div>`;
           }
 
           if (type === 'hotel') {
@@ -517,6 +523,7 @@
 
     function openEventModal(eventId = null) {
       const trip = getCurrentTrip();
+      const allMembers = trip.members || ['自分'];
       
       let evt = {
         id: 'evt_' + Date.now(),
@@ -532,8 +539,8 @@
         bookingStatus: 'unnecessary',
         expense: '',
         currency: 'JPY',
-        paidBy: trip.members ? trip.members[0] : '自分',
-        forMembers: trip.members ? [...trip.members] : ['自分']
+        paidBy: allMembers[0],
+        forMembers: [...allMembers]
       };
 
       if (eventId) {
@@ -545,12 +552,24 @@
         if (found) {
           evt = { ...found };
           if (!evt.type) evt.type = 'spot';
+          if (!evt.forMembers) evt.forMembers = [...allMembers];
         }
       }
 
-      const memberPaidOptions = (trip.members || ['自分']).map(m => 
+      const memberPaidOptions = allMembers.map(m => 
         `<option value="${m}" ${evt.paidBy === m ? 'selected' : ''}>${m}</option>`
       ).join('');
+
+      // ワリカ風「対象メンバー（誰の分か）」チェックボックスリスト
+      const memberForCheckboxes = allMembers.map(m => {
+        const isChecked = evt.forMembers.includes(m);
+        return `
+          <label class="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-gray-50 select-none">
+            <input type="checkbox" name="evt-for-member" value="${m}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded">
+            <span>${m}</span>
+          </label>
+        `;
+      }).join('');
 
       let dayOptionsStart = '', dayOptionsEnd = '';
       for (let d = 1; d <= trip.daysCount; d++) {
@@ -649,11 +668,12 @@
               </select>
             </div>
 
-            <div class="border-t border-b py-2 space-y-2 bg-gray-50/50 -mx-5 px-5">
-              <span class="text-xs font-bold text-green-700 block">💰 費用・負担管理</span>
+            <!-- ワリカ風 費用・対象者設定エリア -->
+            <div class="border-t border-b py-3 space-y-3 bg-green-50/40 -mx-5 px-5">
+              <span class="text-xs font-bold text-green-700 block border-b border-green-200/60 pb-1">💰 費用・ワリカ管理</span>
               <div>
                 <label class="block text-[11px] font-bold text-gray-600 mb-1">金額 (円)</label>
-                <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：15000" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
+                <input id="evt-expense" type="number" value="${evt.expense}" placeholder="例：70640" class="w-full border rounded-lg p-2 text-sm bg-white focus:outline-none focus:border-blue-500">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-gray-600 mb-1">支払った人</label>
@@ -661,11 +681,23 @@
                   ${memberPaidOptions}
                 </select>
               </div>
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-[11px] font-bold text-gray-600">誰の分？（対象メンバー）</label>
+                  <div class="flex gap-2">
+                    <button type="button" onclick="selectAllMembers(true)" class="text-[10px] text-blue-600 font-bold hover:underline">全員</button>
+                    <button type="button" onclick="selectAllMembers(false)" class="text-[10px] text-gray-400 font-bold hover:underline">解除</button>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5" id="for-members-checkbox-group">
+                  ${memberForCheckboxes}
+                </div>
+              </div>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">メモ</label>
-              <textarea id="evt-memo" rows="2" placeholder="注意事項など" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">${evt.memo}</textarea>
+              <textarea id="evt-memo" rows="2" placeholder="予約番号など注意事項" class="w-full border rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">${evt.memo}</textarea>
             </div>
 
             <div class="flex gap-2 pt-2 border-t">
@@ -678,6 +710,11 @@
       `;
       document.getElementById('modal-container').innerHTML = html;
       switchEventType(evt.type || 'spot');
+    }
+
+    function selectAllMembers(select) {
+      const checkboxes = document.querySelectorAll('input[name="evt-for-member"]');
+      checkboxes.forEach(cb => cb.checked = select);
     }
 
     let currentSelectedType = 'spot';
@@ -739,6 +776,9 @@
         s.events = s.events.filter(e => e.id !== eventId);
       });
 
+      // 対象メンバー（誰の分か）の取得
+      const checkedForMembers = Array.from(document.querySelectorAll('input[name="evt-for-member"]:checked')).map(cb => cb.value);
+
       const eventData = {
         id: eventId,
         type,
@@ -753,7 +793,7 @@
         expense: document.getElementById('evt-expense').value,
         currency: 'JPY',
         paidBy: document.getElementById('evt-paidBy').value,
-        forMembers: trip.members ? [...trip.members] : ['自分'],
+        forMembers: checkedForMembers.length > 0 ? checkedForMembers : (trip.members ? [...trip.members] : ['自分']),
         memo: document.getElementById('evt-memo').value.trim()
       };
 
@@ -768,7 +808,9 @@
       if (!confirm('この予定を削除してもよろしいですか？')) return;
       const trip = getCurrentTrip();
       trip.schedule.forEach(s => {
-        s.events = s.events.filter(e => e.id !== eventId);
+        s.events.forEach(e => {
+          s.events = s.events.filter(item => item.id !== eventId);
+        });
       });
 
       saveTrips();
@@ -776,6 +818,7 @@
       switchTab('itinerary');
     }
 
+    // --- ワリカ風精算ロジックの計算機能 ---
     function renderSettlement() {
       const trip = getCurrentTrip();
       if (!trip) return '';
@@ -783,17 +826,95 @@
       const members = trip.members || ['自分'];
       let grandTotalYen = 0;
 
+      // メンバーごとの支払い額と負担額
+      const paidMap = {};
+      const shareMap = {};
+      members.forEach(m => { paidMap[m] = 0; shareMap[m] = 0; });
+
       trip.schedule.forEach(s => {
         s.events.forEach(e => {
-          if (e.expense) grandTotalYen += Number(e.expense);
+          if (e.expense) {
+            const exp = Number(e.expense);
+            grandTotalYen += exp;
+
+            // 払った人の加算
+            const payer = e.paidBy || members[0];
+            if (paidMap[payer] !== undefined) paidMap[payer] += exp;
+
+            // 対象者の均等割り
+            const targets = (e.forMembers && e.forMembers.length > 0) ? e.forMembers : members;
+            const splitAmount = exp / targets.length;
+            targets.forEach(t => {
+              if (shareMap[t] !== undefined) shareMap[t] += splitAmount;
+            });
+          }
         });
       });
+
+      // 個人ごとの収支（プラスは受取、マイナスは支払）
+      const balances = members.map(m => {
+        return { name: m, balance: paidMap[m] - shareMap[m], paid: paidMap[m], share: shareMap[m] };
+      });
+
+      // ワリカ精算ルートの簡易算出
+      let debtors = balances.filter(b => b.balance < -1).map(b => ({ ...b, balance: -b.balance }));
+      let creditors = balances.filter(b => b.balance > 1).map(b => ({ ...b }));
+
+      const transfers = [];
+      let dIdx = 0, cIdx = 0;
+
+      while (dIdx < debtors.length && cIdx < creditors.length) {
+        const debt = debtors[dIdx];
+        const cred = creditors[cIdx];
+        const amount = Math.min(debt.balance, cred.balance);
+
+        if (amount > 0) {
+          transfers.push({ from: debt.name, to: cred.name, amount: Math.round(amount) });
+        }
+
+        debt.balance -= amount;
+        cred.balance -= amount;
+
+        if (debt.balance <= 1) dIdx++;
+        if (cred.balance <= 1) cIdx++;
+      }
+
+      const balanceListHTML = balances.map(b => `
+        <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-none text-xs">
+          <div>
+            <span class="font-bold text-gray-800">${b.name}</span>
+            <div class="text-[10px] text-gray-400">支払: ¥${Math.round(b.paid).toLocaleString()} / 負担: ¥${Math.round(b.share).toLocaleString()}</div>
+          </div>
+          <span class="font-bold ${b.balance >= 0 ? 'text-green-600' : 'text-red-500'}">
+            ${b.balance >= 0 ? '+' : ''}¥${Math.round(b.balance).toLocaleString()}
+          </span>
+        </div>
+      `).join('');
+
+      const transferListHTML = transfers.length > 0 ? transfers.map(t => `
+        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex justify-between items-center text-xs mb-2">
+          <div class="font-bold text-amber-900">
+            <span>${t.from}</span> <span class="text-amber-500">➔</span> <span>${t.to}</span>
+          </div>
+          <span class="font-extrabold text-amber-700 text-sm">¥${t.amount.toLocaleString()}</span>
+        </div>
+      `).join('') : '<p class="text-xs text-gray-400 text-center py-2">精算の必要はありません</p>';
 
       return `
         <div class="space-y-4">
           <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl shadow">
             <p class="text-xs text-blue-100">旅程に登録された総費用</p>
             <p class="text-2xl font-bold mt-0.5">約 ¥${Math.round(grandTotalYen).toLocaleString()}</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-xs font-bold text-gray-700 mb-2">🤝 メンバー別収支状況</h3>
+            ${balanceListHTML}
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-xs font-bold text-gray-700 mb-3">💡 最終清算ルート (ワリカ計算)</h3>
+            ${transferListHTML}
           </div>
         </div>`;
     }
@@ -895,7 +1016,6 @@
       switchTab('ai');
     }
 
-    // 複数行・多様なフォーマットに対応した高度なテキスト解析ロジック
     function parseTextToEvents(fullText, trip) {
       const lines = fullText.split('\n');
       const results = [];
@@ -905,13 +1025,11 @@
         const text = line.trim();
         if (!text) return;
 
-        // Day検出 (例: 1日目, Day2, 🗓️1日目 など)
         const dayMatch = text.match(/(?:🗓️)?\s*(\d+)\s*日目/i) || text.match(/Day\s*(\d+)/i);
         if (dayMatch) {
           currentDay = Math.min(parseInt(dayMatch[1]), trip.daysCount);
         }
 
-        // 時間パターンの検出 (例: 13:15〜14:15, 10:00, 10時00分, 10:00発)
         let time = '', endTime = '';
         const rangeMatch = text.match(/(\d{1,2}:\d{2})\s*(?:〜|~|-|ー)\s*(\d{1,2}:\d{2})/);
         if (rangeMatch) {
@@ -922,7 +1040,6 @@
           if (singleMatch) time = singleMatch[1];
         }
 
-        // 矢印「→」による移動検出 (例: 羽田 → 別府泊)
         let type = 'spot';
         let fromLoc = '', toLoc = '';
         const arrowSplit = text.split(/→|➔|->/);
@@ -937,7 +1054,6 @@
           type = 'move';
         }
 
-        // スポット・タイトル名抽出（時間記号や絵文字の除去）
         let title = text
           .replace(/(?:🗓️)?\s*\d+\s*日目.*$/g, '')
           .replace(/\d{1,2}:\d{2}(?:\s*(?:〜|~|-|ー)\s*\d{1,2}:\d{2})?/, '')
